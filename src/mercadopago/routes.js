@@ -7,5 +7,3 @@ const router = Router();
 router.post("/payments", createOrder);
 
 export default router;
-
-

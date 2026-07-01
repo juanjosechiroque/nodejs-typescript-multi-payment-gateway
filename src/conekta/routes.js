@@ -7,5 +7,3 @@ const router = Router();
 router.post("/order", createOrder);
 
 export default router;
-
-

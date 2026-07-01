@@ -7,7 +7,7 @@ import mercadoPagoRoutes from "../mercadopago/routes.js";
 const router = Router();
 
 router.get("/", (req, res) => {
-	res.send("Running");
+    res.send("Running");
 });
 
 router.use("/stripe", stripeRoutes);

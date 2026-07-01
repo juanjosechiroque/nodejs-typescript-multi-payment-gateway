@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-config({silent: process.env.NODE_ENV != "production"});
+config({ silent: process.env.NODE_ENV != "production" });
 
 export const PORT = process.env.PORT;
 export const NODE_ENV = process.env.NODE_ENV;

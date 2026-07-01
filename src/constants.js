@@ -1,9 +1,9 @@
 export const PROVIDERS = {
-	STRIPE: "Stripe",
-	CONEKTA: "Conekta"
+    STRIPE: "Stripe",
+    CONEKTA: "Conekta",
 };
 
 export const OPERATION = {
-	CHARGE: "Charges",
-	REFUND: "Refund"
+    CHARGE: "Charges",
+    REFUND: "Refund",
 };

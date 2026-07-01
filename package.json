@@ -1,32 +1,36 @@
 {
-  "name": "nodejs-api-payment-gateway",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "type": "module",
-  "scripts": {
-    "start": "NODE_ENV=production node index.js",
-    "dev": "NODE_ENV=development nodemon index.js",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
-  },
-  "keywords": [],
-  "author": "juanjosechiroque",
-  "license": "MIT",
-  "engines": {
-    "node": ">=24"
-  },
-  "dependencies": {
-    "conekta": "^4.2.0",
-    "cors": "2.8.6",
-    "express": "5.2.1",
-    "helmet": "8.2.0",
-    "mercadopago": "^1.5.15",
-    "stripe": "^11.1.0"
-  },
-  "devDependencies": {
-    "dotenv": "^16.0.3",
-    "eslint": "^8.28.0",
-    "nodemon": "3.1.14"
-  }
+    "name": "nodejs-api-payment-gateway",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "start": "NODE_ENV=production node index.js",
+        "dev": "NODE_ENV=development nodemon index.js",
+        "validate": "eslint . && prettier --check .",
+        "format": "prettier --write . && eslint . --fix"
+    },
+    "keywords": [],
+    "author": "juanjosechiroque",
+    "license": "MIT",
+    "engines": {
+        "node": ">=24"
+    },
+    "dependencies": {
+        "conekta": "^4.2.0",
+        "cors": "2.8.6",
+        "express": "5.2.1",
+        "helmet": "8.2.0",
+        "mercadopago": "^1.5.15",
+        "stripe": "^11.1.0"
+    },
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "dotenv": "^16.0.3",
+        "eslint": "^10.6.0",
+        "eslint-config-prettier": "^10.1.8",
+        "globals": "^17.7.0",
+        "nodemon": "3.1.14",
+        "prettier": "^3.9.4"
+    }
 }
