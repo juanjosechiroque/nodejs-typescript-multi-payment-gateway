@@ -60,7 +60,6 @@ export const charges = async (req, res, next) => {
             receipt_url: paymentIntent.charges?.data[0]?.receipt_url,
         };
 
-        console.log(JSON.stringify(paymentIntent, null, 4));
         res.status(201).json(result);
     } catch (err) {
         setCustomError(err);

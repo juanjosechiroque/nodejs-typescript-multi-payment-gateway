@@ -39,8 +39,6 @@ export const createOrder = async (req, res, next) => {
             },
         });
 
-        console.log("orderCreated ::", orderCreated._json);
-
         const result = {
             checkout_id: orderCreated._json.checkout.id,
             order_id: orderCreated._json.id,
