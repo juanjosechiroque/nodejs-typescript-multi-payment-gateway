@@ -23,7 +23,6 @@ Thumbs.db
 # Editor folders
 .vscode/
 .idea/
-.cursor/
 
 # Optional npm cache
 .npm

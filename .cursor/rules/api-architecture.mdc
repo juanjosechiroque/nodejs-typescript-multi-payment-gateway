@@ -1,0 +1,66 @@
+---
+description: Architecture and coding rules for this Express 5 payment gateway API. Full reference in ARCHITECTURE.md.
+alwaysApply: true
+---
+
+# Architecture Rules
+
+Full reference: `ARCHITECTURE.md` at the project root. These rules are the actionable subset for AI-assisted development.
+
+## Stack
+
+Node.js 24 ESM · Express 5 · Joi · Stripe · Mercado Pago · Conekta · ESLint · Prettier
+
+## Layer flow — never skip or reverse
+
+```
+router → controller → external SDK
+```
+
+- **router**: routes + validation middleware only. Never contain logic.
+- **controller**: reads `req.body`, calls SDK, maps response, sends JSON. Nothing else.
+- **validation**: Joi schema applied at the router before the controller runs.
+
+## When adding a new gateway
+
+Create files under `src/{gateway}/`:
+
+```
+{gateway}/routes.js          # Route definitions + validate() wiring
+{gateway}/controller.js      # HTTP layer: reads req, calls SDK, sends response
+{gateway}/{gateway}.validation.js  # Joi schema
+```
+
+Register the router in `src/routes/index.js`.
+
+## Errors
+
+Use typed factories from `src/errors.js`:
+
+```js
+throw BadRequestError("Invalid card");
+throw GatewayError("Stripe returned an unexpected error");
+```
+
+Never `res.status(400).json(...)` directly from a controller. Let errors propagate to `errorGenericHandler` in `src/middleware/error.js`.
+
+## Validation
+
+Apply `validate(schema)` at the router before the controller:
+
+```js
+router.post("/charges", validate(chargesSchema), charges);
+```
+
+Validation errors return `400` with a `details` array. Never validate inside the controller.
+
+## Environment variables
+
+Declare and export from `src/config.js`. Never read `process.env` directly in feature code.
+
+## DO NOT
+
+- Validate input inside a controller
+- Read `process.env` outside `src/config.js`
+- Create shared `controllers/` or `routes/` folders for gateway-specific code
+- Return raw SDK responses without mapping to a clean shape

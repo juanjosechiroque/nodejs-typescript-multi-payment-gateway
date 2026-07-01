@@ -167,7 +167,13 @@ Stack traces are included in non-production environments only.
 
 ## Architecture
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for layer responsibilities, folder structure, and how this project relates to the base boilerplate.
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for layer responsibilities, folder structure, and conventions.
+
+### AI-assisted development
+
+| Tool   | File                                 |
+| ------ | ------------------------------------ |
+| Cursor | [`.cursor/rules/`](./.cursor/rules/) |
 
 ## License
 

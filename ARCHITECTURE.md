@@ -34,8 +34,10 @@ src/
 ├── routes/
 │   └── index.js               # Mounts all gateway routers under /api
 ├── app.js                     # Express app setup
-└── config.js                  # Environment variable validation and exports
+├── config.js                  # Environment variable validation and exports
+└── errors.js                  # Typed error factories
 index.js                       # Server entrypoint
+.cursor/rules/                 # Cursor AI coding rules (points to ARCHITECTURE.md)
 ```
 
 ## Layer responsibilities and data flow
@@ -87,6 +89,18 @@ Stack traces are included only in non-production environments.
 ## Environment configuration
 
 All environment variables are declared and validated at startup in `src/config.js`. Missing required variables cause an immediate process exit. Feature code imports named constants from `config.js` — never reads `process.env` directly.
+
+## Error handling
+
+Typed error factories live in `src/errors.js`:
+
+```js
+throw BadRequestError("Invalid card number");
+throw GatewayError("Stripe returned an unexpected error");
+throw NotFoundError("Resource not found");
+```
+
+Errors propagate to `errorGenericHandler` in `src/middleware/error.js` via `next(err)`. Controllers never call `res.status().json()` for errors directly.
 
 ## Why no service or DAO layer
 
