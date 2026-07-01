@@ -15,7 +15,7 @@ export const createOrder = async (req, res, next) => {
         });
 
         customer = customer.toObject();
-        amount = amount * 100;
+        amount = Math.round(Number(amount) * 100);
 
         const orderCreated = await conekta.Order.create({
             currency: currency,

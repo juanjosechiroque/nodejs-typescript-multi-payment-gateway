@@ -1,4 +1,4 @@
-import { NODE_ENV } from "./config.js";
+import { NODE_ENV } from "../config.js";
 
 export const notFoundHandler = (req, res, next) => {
     res.status(404).json({

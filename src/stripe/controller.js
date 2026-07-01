@@ -1,20 +1,10 @@
 import Stripe from "stripe";
 import { STRIPE_PRIVATE_KEY } from "../config.js";
+
 const stripe = new Stripe(STRIPE_PRIVATE_KEY);
 
-const setCustomError = (err) => {
-    if (["StripeCardError", "StripeInvalidRequestError"].includes(err.type)) {
-        err.status = err.status || err.statusCode;
-        if (err.param) {
-            err.status = 400;
-            err.message = `The parameter ${err.param} is invalid or missing`;
-        }
-        err.code = err.raw.code || "stripe_error";
-    }
-};
-
 export const charges = async (req, res, next) => {
-    let {
+    const {
         card_number,
         expiry_month,
         expiry_year,
@@ -27,9 +17,7 @@ export const charges = async (req, res, next) => {
     } = req.body;
 
     try {
-        const customer = await stripe.customers.create({
-            email: customer_email,
-        });
+        const customer = await stripe.customers.create({ email: customer_email });
 
         const paymentMethod = await stripe.paymentMethods.create({
             type: "card",
@@ -37,32 +25,33 @@ export const charges = async (req, res, next) => {
                 number: card_number,
                 exp_month: expiry_month,
                 exp_year: expiry_year,
-                cvc: cvc,
+                cvc,
             },
         });
 
-        amount = amount * 100;
-
         const paymentIntent = await stripe.paymentIntents.create({
             payment_method: paymentMethod.id,
-            amount: amount,
+            amount: Math.round(Number(amount) * 100),
             currency: currency_code,
             confirm: true,
             payment_method_types: ["card"],
             customer: customer.id,
-            description: description,
-            metadata: metadata,
+            description,
+            metadata,
         });
 
-        const result = {
+        res.status(201).json({
             charge_id: paymentIntent.id,
             status: paymentIntent.status,
-            receipt_url: paymentIntent.charges?.data[0]?.receipt_url,
-        };
-
-        res.status(201).json(result);
+            receipt_url: paymentIntent.charges?.data[0]?.receipt_url ?? null,
+        });
     } catch (err) {
-        setCustomError(err);
+        if (err.type === "StripeCardError" || err.type === "StripeInvalidRequestError") {
+            err.status = err.param ? 400 : err.statusCode;
+            if (err.param) {
+                err.message = `The parameter ${err.param} is invalid or missing`;
+            }
+        }
         next(err);
     }
 };
