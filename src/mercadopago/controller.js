@@ -23,7 +23,7 @@ export const createOrder = async (req, res, next) => {
         const response = await payment.save(paymentData);
         const { status, status_detail, id } = response.body;
         return res.status(response.status).json({ status, status_detail, id });
-    } catch (error) {
-        next(error);
+    } catch (err) {
+        next(err);
     }
 };

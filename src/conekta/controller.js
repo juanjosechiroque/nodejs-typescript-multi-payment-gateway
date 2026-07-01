@@ -5,17 +5,17 @@ conekta.api_key = CONEKTA_PRIVATE_KEY;
 conekta.api_version = "2.0.0";
 
 export const createOrder = async (req, res, next) => {
-    let { customer_name, customer_email, reference, amount, currency, success_url, failure_url } =
+    const { customer_name, customer_email, reference, amount, currency, success_url, failure_url } =
         req.body;
 
     try {
-        let customer = await conekta.Customer.create({
+        const customerRaw = await conekta.Customer.create({
             name: customer_name,
             email: customer_email,
         });
 
-        customer = customer.toObject();
-        amount = Math.round(Number(amount) * 100);
+        const customer = customerRaw.toObject();
+        const amountInCents = Math.round(Number(amount) * 100);
 
         const orderCreated = await conekta.Order.create({
             currency: currency,
@@ -25,7 +25,7 @@ export const createOrder = async (req, res, next) => {
             line_items: [
                 {
                     name: reference,
-                    unit_price: amount,
+                    unit_price: amountInCents,
                     quantity: 1,
                 },
             ],
@@ -46,7 +46,7 @@ export const createOrder = async (req, res, next) => {
         };
 
         res.status(201).json(result);
-    } catch (error) {
-        next(error);
+    } catch (err) {
+        next(err);
     }
 };
