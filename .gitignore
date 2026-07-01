@@ -1,2 +1,32 @@
-node_modules
+# Dependencies
+node_modules/
+
+# Environment variables
 .env
+.env.*
+!.env.example
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Runtime files
+pids
+*.pid
+*.pid.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor folders
+.vscode/
+.idea/
+.cursor/
+
+# Optional npm cache
+.npm
+
+# Output of npm pack
+*.tgz
