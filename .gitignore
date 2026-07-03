@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 
+# TypeScript build output
+dist/
+coverage/
+
 # Environment variables
 .env
 .env.*

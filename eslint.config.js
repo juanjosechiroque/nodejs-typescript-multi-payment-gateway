@@ -2,10 +2,11 @@ import js from "@eslint/js";
 import { defineConfig } from "eslint/config";
 import eslintConfigPrettier from "eslint-config-prettier/flat";
 import globals from "globals";
+import tseslint from "typescript-eslint";
 
 export default defineConfig([
     {
-        ignores: ["node_modules/", "dist/", "build/", "*.min.js"],
+        ignores: ["node_modules/", "coverage/", "dist/", "build/", "*.min.js"],
     },
     {
         files: ["**/*.js"],
@@ -14,15 +15,30 @@ export default defineConfig([
         languageOptions: {
             ecmaVersion: "latest",
             sourceType: "module",
-            globals: {
-                ...globals.node,
+            globals: { ...globals.node },
+        },
+    },
+    ...tseslint.configs.recommendedTypeChecked.map((config) => ({
+        ...config,
+        files: ["**/*.ts"],
+    })),
+    {
+        files: ["**/*.ts"],
+        languageOptions: {
+            parserOptions: {
+                project: ["./tsconfig.eslint.json"],
+                tsconfigRootDir: import.meta.dirname,
             },
+            globals: { ...globals.node },
         },
         rules: {
-            "no-unused-vars": [
+            "@typescript-eslint/no-floating-promises": "off",
+            "@typescript-eslint/no-misused-promises": "off",
+            "@typescript-eslint/restrict-template-expressions": "off",
+            "@typescript-eslint/no-unused-vars": [
                 "error",
                 {
-                    argsIgnorePattern: "next",
+                    argsIgnorePattern: "^_",
                     caughtErrorsIgnorePattern: "^(err|error|_)$",
                 },
             ],

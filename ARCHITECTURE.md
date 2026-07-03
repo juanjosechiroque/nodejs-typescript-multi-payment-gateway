@@ -4,40 +4,33 @@ This document describes the structure, conventions, and design decisions behind 
 
 ## Stack
 
-| Layer        | Technology                    |
-| ------------ | ----------------------------- |
-| Runtime      | Node.js 24+ (ESM)             |
-| Framework    | Express 5                     |
-| Validation   | Joi                           |
-| Gateways     | Stripe, Mercado Pago, Conekta |
-| Code quality | ESLint + Prettier             |
+| Layer        | Technology          |
+| ------------ | ------------------- |
+| Runtime      | Node.js 24+ (ESM)   |
+| Language     | TypeScript (strict) |
+| Framework    | Express 5           |
+| Validation   | Zod                 |
+| Gateways     | Stripe              |
+| Code quality | ESLint + Prettier   |
 
 ## Project structure
 
 ```
 src/
-├── stripe/                    # Stripe integration
-│   ├── routes.js              # Route definitions + validation wiring
-│   ├── controller.js          # HTTP layer: reads req, calls SDK, sends response
-│   └── stripe.validation.js   # Joi schema for stripe requests
-├── mercadopago/               # Mercado Pago integration
-│   ├── routes.js
-│   ├── controller.js
-│   └── mercadopago.validation.js
-├── conekta/                   # Conekta integration
-│   ├── routes.js
-│   ├── controller.js
-│   └── conekta.validation.js
+├── stripe/
+│   ├── routes.ts              # Route definitions + validation wiring
+│   ├── controller.ts          # HTTP layer: reads req, calls SDK, sends response
+│   └── stripe.validation.ts   # Zod schema + inferred ChargesBody type
 ├── middleware/
-│   ├── error.js               # notFoundHandler + errorGenericHandler
-│   └── validate.js            # Shared Joi validation middleware
+│   ├── error.ts               # notFoundHandler + errorGenericHandler
+│   └── validate.ts            # Shared Zod validation middleware
 ├── routes/
-│   └── index.js               # Mounts all gateway routers under /api
-├── app.js                     # Express app setup
-├── config.js                  # Environment variable validation and exports
-└── errors.js                  # Typed error factories
-index.js                       # Server entrypoint
-.cursor/rules/                 # Cursor AI coding rules (points to ARCHITECTURE.md)
+│   └── index.ts               # Mounts all routers under /api
+├── app.ts                     # Express app setup
+├── config.ts                  # Environment variable validation and exports
+└── errors.ts                  # Typed error factories (AppError, BadRequestError, GatewayError...)
+index.ts                       # Server entrypoint
+.cursor/rules/                 # Cursor AI coding rules
 ```
 
 ## Layer responsibilities and data flow
@@ -52,56 +45,62 @@ This project has no database. The data flow is simpler than a CRUD API:
 | ------------ | ---------------------------------------------------------------- | ------------------------------ |
 | `router`     | Declare routes, attach `validate()` middleware                   | Contain logic                  |
 | `controller` | Read `req.body`, call SDK, map response, send JSON               | Call other controllers         |
-| `validation` | Joi schema — validates and strips unknown fields at router level | Contain business rules         |
+| `validation` | Zod schema — validates and strips unknown fields at router level | Contain business rules         |
 | `middleware` | Shared: error formatting, input validation                       | Contain gateway-specific logic |
 
 ## Request validation
 
 All routes apply `validate(schema)` before the controller runs:
 
-```js
+```ts
 router.post("/charges", validate(chargesSchema), charges);
 ```
 
-Validation errors return `400` with a `details` array:
+Zod schemas export an inferred type used directly in controllers — no duplicate interface definitions:
+
+```ts
+export const chargesSchema = z.object({ ... });
+export type ChargesBody = z.infer<typeof chargesSchema>;
+```
+
+Validation errors return `400` with a `details` array listing every failing field:
 
 ```json
 {
     "status": 400,
-    "code": "ValidationError",
+    "code": "BadRequestError",
     "message": "Validation failed",
-    "details": [{ "field": "amount", "message": "\"amount\" must be a positive number" }]
+    "details": [
+        { "field": "amount", "message": "Number must be greater than 0" },
+        { "field": "customer_email", "message": "Invalid email" }
+    ]
 }
 ```
 
-## Response shape
+## Error handling
 
-Gateway responses are returned directly from the controller without a common envelope, since each provider has its own meaningful response structure.
+Typed error factories live in `src/errors.ts`:
 
-Error responses flow through `errorGenericHandler` in `src/middleware/error.js`:
+```ts
+throw BadRequestError("Invalid card number");
+throw GatewayError("Stripe returned an unexpected error");
+throw NotFoundError("Resource not found");
+```
+
+Errors propagate to `errorGenericHandler` in `src/middleware/error.ts` via `next(err)`. Controllers never call `res.status().json()` for errors directly.
+
+Error responses follow a consistent shape:
 
 ```json
-{ "status": 500, "code": "InternalServerError", "message": "Internal server error" }
+{ "status": 502, "code": "GatewayError", "message": "Stripe returned an unexpected error" }
 ```
 
 Stack traces are included only in non-production environments.
 
 ## Environment configuration
 
-All environment variables are declared and validated at startup in `src/config.js`. Missing required variables cause an immediate process exit. Feature code imports named constants from `config.js` — never reads `process.env` directly.
-
-## Error handling
-
-Typed error factories live in `src/errors.js`:
-
-```js
-throw BadRequestError("Invalid card number");
-throw GatewayError("Stripe returned an unexpected error");
-throw NotFoundError("Resource not found");
-```
-
-Errors propagate to `errorGenericHandler` in `src/middleware/error.js` via `next(err)`. Controllers never call `res.status().json()` for errors directly.
+All environment variables are declared and validated at startup in `src/config.ts`. Missing required variables cause an immediate process exit. Feature code imports named constants from `config.ts` — never reads `process.env` directly.
 
 ## Why no service or DAO layer
 
-This project has no database, so the `service → dao → model` layers that appear in CRUD APIs are not needed. Controllers delegate directly to the external SDK. If provider logic grows complex enough to warrant abstraction, a `service` layer can be introduced between the controller and the SDK call.
+This project has no database, so the `service → dao → model` layers that appear in CRUD APIs are not needed. Controllers delegate directly to the external SDK. When the adapter pattern is introduced for multi-provider support, a `service` layer will sit between the controller and the adapters.

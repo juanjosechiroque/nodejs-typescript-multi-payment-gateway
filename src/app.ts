@@ -10,6 +10,10 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
+app.get("/", (_req, res) => {
+    res.json({ status: "running" });
+});
+
 app.use("/api", routes);
 app.use(notFoundHandler);
 app.use(errorGenericHandler);

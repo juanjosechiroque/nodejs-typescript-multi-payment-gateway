@@ -1,75 +1,53 @@
-# Payment Gateway API
+# nodejs-typescript-multi-payment-gateway
 
-A **Node.js REST API** that integrates three payment providers — **Stripe**, **Mercado Pago**, and **Conekta** — under a single Express application.
+A **TypeScript REST API** that integrates multiple payment providers under a single unified interface using the **adapter pattern**.
 
-Built with Express 5, Joi validation, ESLint, Prettier, and structured for production use.
+Built with Express 5, TypeScript, Zod validation, ESLint, and Prettier.
 
-## Features
+## Stack
 
-- ⚡ **JavaScript (ESM)** — native modules, Node.js 24+
-- 🚀 **Express 5** — HTTP layer
-- 💳 **Stripe** — card charges via PaymentIntents API
-- 💳 **Mercado Pago** — payment processing
-- 💳 **Conekta** — hosted payment pages
-- 📋 **Joi** — request validation on all routes
-- 📝 **ESLint & Prettier** — enforced style and static checks
+- **TypeScript** — strict mode, ESM, Node.js 24+
+- **Express 5** — HTTP layer
+- **Zod** — schema validation with typed inference
+- **Stripe** — card payments via PaymentIntents API
+- **ESLint + Prettier** — enforced style and static analysis
+- **Husky** — pre-commit validation hook
 
 ## Requirements
 
-- Node.js 24+ (use `.nvmrc` with `nvm use` to pin the version automatically)
+- Node.js 24+ (use `.nvmrc` with `nvm use`)
 - npm
+- A [Stripe account](https://stripe.com) — free, test mode available
 
 ## Quick Start
 
-1. **Clone the repository**
+```bash
+git clone https://github.com/juanjosechiroque/nodejs-typescript-multi-payment-gateway.git
+cd nodejs-typescript-multi-payment-gateway
+npm install
+cp .env.example .env   # add your STRIPE_PRIVATE_KEY
+npm run dev
+```
 
-    ```bash
-    git clone <your-repo-url>
-    cd nodejs-api-payment-gateway
-    ```
-
-2. **Install dependencies**
-
-    ```bash
-    npm install
-    ```
-
-3. **Set up environment**
-
-    ```bash
-    cp .env.example .env
-    # Fill in your gateway credentials
-    ```
-
-4. **Start the development server**
-
-    ```bash
-    npm run dev
-    ```
-
-    The API listens on port `3000` by default.
-
-## Available Scripts
-
-| Script             | Description             |
-| ------------------ | ----------------------- |
-| `npm start`        | Start server            |
-| `npm run dev`      | Start dev server        |
-| `npm run validate` | ESLint + Prettier check |
-| `npm run format`   | Format + ESLint --fix   |
+The API listens on `http://localhost:3000` by default.
 
 ## Environment Variables
 
-Copy `.env.example` to `.env`:
+| Variable             | Required | Description                                        |
+| -------------------- | -------- | -------------------------------------------------- |
+| `PORT`               | No       | HTTP port (default `3000`)                         |
+| `STRIPE_PRIVATE_KEY` | **Yes**  | Stripe secret key (`sk_test_...` or `sk_live_...`) |
 
-| Variable                   | Required | Description                  |
-| -------------------------- | -------- | ---------------------------- |
-| `PORT`                     | No       | HTTP port (default `3000`)   |
-| `STRIPE_PRIVATE_KEY`       | **Yes**  | Stripe secret key (`sk_...`) |
-| `CONEKTA_PRIVATE_KEY`      | **Yes**  | Conekta private key          |
-| `MERCADOPAGO_ACCESS_TOKEN` | **Yes**  | Mercado Pago access token    |
+## Available Scripts
 
-The app exits at startup if any required variable is missing or empty.
+| Script              | Description                      |
+| ------------------- | -------------------------------- |
+| `npm run dev`       | Start dev server with hot reload |
+| `npm start`         | Start production server          |
+| `npm run build`     | Compile TypeScript to `dist/`    |
+| `npm run typecheck` | Type-check without emitting      |
+| `npm run validate`  | ESLint + Prettier check          |
+| `npm run format`    | Format + ESLint --fix            |
 
 ## API Endpoints
 
@@ -77,9 +55,11 @@ All routes are mounted under `/api`.
 
 ### Stripe
 
-- `POST /api/stripe/charges` — create a card charge
+#### `POST /api/stripe/charges`
 
-**Request body:**
+Create a card charge using raw card data (test mode only).
+
+**Request:**
 
 ```json
 {
@@ -99,56 +79,19 @@ All routes are mounted under `/api`.
 ```json
 {
     "charge_id": "pi_xxx",
-    "status": "succeeded",
-    "receipt_url": "https://pay.stripe.com/receipts/..."
+    "status": "succeeded"
 }
 ```
 
-### Mercado Pago
+### Test Cards (Stripe test mode)
 
-- `POST /api/mercadopago/payments` — create a payment
+| Card number        | Result             |
+| ------------------ | ------------------ |
+| `4242424242424242` | Success            |
+| `4000000000000002` | Declined           |
+| `4000000000009995` | Insufficient funds |
 
-**Request body:**
-
-```json
-{
-    "token": "card_token",
-    "issuer_id": "12345",
-    "installments": 1,
-    "description": "Order #1234",
-    "transactionAmount": 100.0,
-    "paymentMethodId": "visa",
-    "payer": { "email": "user@example.com" }
-}
-```
-
-### Conekta
-
-- `POST /api/conekta/order` — create a hosted payment order
-
-**Request body:**
-
-```json
-{
-    "customer_name": "John Doe",
-    "customer_email": "user@example.com",
-    "reference": "Order #1234",
-    "amount": 100.0,
-    "currency": "MXN",
-    "success_url": "https://yoursite.com/success",
-    "failure_url": "https://yoursite.com/failure"
-}
-```
-
-**Response:**
-
-```json
-{
-    "checkout_id": "checkout_xxx",
-    "order_id": "ord_xxx",
-    "redirect_url": "https://pay.conekta.com/..."
-}
-```
+Use any future expiry date and any 3-digit CVC.
 
 ## Error Responses
 
@@ -157,9 +100,12 @@ All errors follow a consistent shape:
 ```json
 {
     "status": 400,
-    "code": "ValidationError",
+    "code": "BadRequestError",
     "message": "Validation failed",
-    "details": [{ "field": "amount", "message": "\"amount\" must be a positive number" }]
+    "details": [
+        { "field": "amount", "message": "Number must be greater than 0" },
+        { "field": "customer_email", "message": "Invalid email" }
+    ]
 }
 ```
 
@@ -167,13 +113,7 @@ Stack traces are included in non-production environments only.
 
 ## Architecture
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for layer responsibilities, folder structure, and conventions.
-
-### AI-assisted development
-
-| Tool   | File                                 |
-| ------ | ------------------------------------ |
-| Cursor | [`.cursor/rules/`](./.cursor/rules/) |
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for layer responsibilities, folder structure, and design decisions.
 
 ## License
 
