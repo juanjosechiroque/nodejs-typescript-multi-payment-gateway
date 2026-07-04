@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { charges } from "./controller.js";
+import { charges } from "./stripe.controller.js";
 import { validate } from "../middleware/validate.js";
 import { chargesSchema } from "./stripe.validation.js";
 

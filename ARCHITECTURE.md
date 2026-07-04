@@ -18,8 +18,8 @@ This document describes the structure, conventions, and design decisions behind 
 ```
 src/
 ├── stripe/
-│   ├── routes.ts              # Route definitions + validation wiring
-│   ├── controller.ts          # HTTP layer: reads req, calls SDK, sends response
+│   ├── stripe.routes.ts       # Route definitions + validation wiring
+│   ├── stripe.controller.ts   # HTTP layer: reads req, calls SDK, sends response
 │   └── stripe.validation.ts   # Zod schema + inferred ChargesBody type
 ├── middleware/
 │   ├── error.ts               # notFoundHandler + errorGenericHandler

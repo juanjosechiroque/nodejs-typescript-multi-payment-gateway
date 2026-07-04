@@ -7,33 +7,14 @@ import type { ChargesBody } from "./stripe.validation.js";
 const stripe = new Stripe(STRIPE_PRIVATE_KEY, { apiVersion: "2022-11-15" });
 
 export const charges = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const {
-        card_number,
-        expiry_month,
-        expiry_year,
-        cvc,
-        amount,
-        currency_code,
-        customer_email,
-        description,
-        metadata,
-    } = req.body as ChargesBody;
+    const { payment_method_id, amount, currency_code, customer_email, description, metadata } =
+        req.body as ChargesBody;
 
     try {
         const customer = await stripe.customers.create({ email: customer_email });
 
-        const paymentMethod = await stripe.paymentMethods.create({
-            type: "card",
-            card: {
-                number: card_number,
-                exp_month: expiry_month,
-                exp_year: expiry_year,
-                cvc,
-            },
-        });
-
         const intentParams: Stripe.PaymentIntentCreateParams = {
-            payment_method: paymentMethod.id,
+            payment_method: payment_method_id,
             amount: Math.round(Number(amount) * 100),
             currency: currency_code,
             confirm: true,

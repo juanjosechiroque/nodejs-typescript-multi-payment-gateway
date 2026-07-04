@@ -1,5 +1,5 @@
 import { Router } from "express";
-import stripeRoutes from "../stripe/routes.js";
+import stripeRoutes from "../stripe/stripe.routes.js";
 
 const router = Router();
 

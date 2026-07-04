@@ -57,16 +57,13 @@ All routes are mounted under `/api`.
 
 #### `POST /api/stripe/charges`
 
-Create a card charge using raw card data (test mode only).
+Create a card charge using a tokenized payment method from Stripe.js.
 
 **Request:**
 
 ```json
 {
-    "card_number": "4242424242424242",
-    "expiry_month": 12,
-    "expiry_year": 2026,
-    "cvc": "123",
+    "payment_method_id": "pm_card_visa",
     "amount": 100.0,
     "currency_code": "USD",
     "customer_email": "user@example.com",
@@ -83,15 +80,16 @@ Create a card charge using raw card data (test mode only).
 }
 ```
 
-### Test Cards (Stripe test mode)
+### Testing without a frontend
 
-| Card number        | Result             |
-| ------------------ | ------------------ |
-| `4242424242424242` | Success            |
-| `4000000000000002` | Declined           |
-| `4000000000009995` | Insufficient funds |
+Use these Stripe test payment method IDs in the request body:
 
-Use any future expiry date and any 3-digit CVC.
+| `payment_method_id`         | Result             |
+| --------------------------- | ------------------ |
+| `pm_card_visa`              | Success            |
+| `pm_card_mastercard`        | Success            |
+| `pm_card_chargeDeclined`    | Declined           |
+| `pm_card_insufficientFunds` | Insufficient funds |
 
 ## Error Responses
 

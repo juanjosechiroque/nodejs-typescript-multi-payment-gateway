@@ -26,8 +26,8 @@ router → controller → external SDK
 Create files under `src/{gateway}/`:
 
 ```
-{gateway}/routes.ts
-{gateway}/controller.ts
+{gateway}/{gateway}.routes.ts
+{gateway}/{gateway}.controller.ts
 {gateway}/{gateway}.validation.ts   # Zod schema + exported inferred type
 ```
 
