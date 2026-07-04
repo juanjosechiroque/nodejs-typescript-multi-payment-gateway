@@ -14,6 +14,7 @@ This document describes the structure, conventions, and design decisions behind 
 | Logging       | Pino + pino-http    |
 | Rate limiting | express-rate-limit  |
 | Code quality  | ESLint + Prettier   |
+| CI/CD         | GitHub Actions      |
 
 ## Project structure
 
