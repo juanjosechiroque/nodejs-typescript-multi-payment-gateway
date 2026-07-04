@@ -16,3 +16,6 @@ if (missing.length > 0) {
 export const PORT = Number(env.PORT) || 3000;
 export const NODE_ENV = env.NODE_ENV;
 export const STRIPE_PRIVATE_KEY = env.STRIPE_PRIVATE_KEY as string;
+export const RATE_LIMIT_WINDOW_MINUTES = Number(env.RATE_LIMIT_WINDOW_MINUTES) || 1;
+export const RATE_LIMIT_MAX = Number(env.RATE_LIMIT_MAX) || 60;
+export const LOG_LEVEL = env.LOG_LEVEL ?? "info";

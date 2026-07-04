@@ -1,0 +1,21 @@
+# CLAUDE.md
+
+Architecture, patterns, and conventions are documented in [`ARCHITECTURE.md`](./ARCHITECTURE.md). Read it before making any changes.
+
+## Commands
+
+```bash
+npm run dev           # development server
+npm run validate      # ESLint + Prettier check
+npm run typecheck     # TypeScript typecheck
+npm run build         # compile TypeScript to dist/
+npm run format        # auto-fix
+```
+
+## Before committing
+
+```bash
+npm run validate && npm run typecheck && npm run build
+```
+
+All checks must pass. Fix any failures before committing — do not skip hooks.

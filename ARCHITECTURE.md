@@ -4,14 +4,16 @@ This document describes the structure, conventions, and design decisions behind 
 
 ## Stack
 
-| Layer        | Technology          |
-| ------------ | ------------------- |
-| Runtime      | Node.js 24+ (ESM)   |
-| Language     | TypeScript (strict) |
-| Framework    | Express 5           |
-| Validation   | Zod                 |
-| Gateways     | Stripe              |
-| Code quality | ESLint + Prettier   |
+| Layer         | Technology          |
+| ------------- | ------------------- |
+| Runtime       | Node.js 24+ (ESM)   |
+| Language      | TypeScript (strict) |
+| Framework     | Express 5           |
+| Validation    | Zod                 |
+| Gateways      | Stripe              |
+| Logging       | Pino + pino-http    |
+| Rate limiting | express-rate-limit  |
+| Code quality  | ESLint + Prettier   |
 
 ## Project structure
 
@@ -24,6 +26,9 @@ src/
 ├── middleware/
 │   ├── error.ts               # notFoundHandler + errorGenericHandler
 │   └── validate.ts            # Shared Zod validation middleware
+├── utils/
+│   ├── asyncHandler.ts        # Wraps async controllers — forwards rejections to next()
+│   └── logger.ts              # Pino logger instance (pretty output in development)
 ├── routes/
 │   └── index.ts               # Mounts all routers under /api
 ├── app.ts                     # Express app setup
@@ -41,19 +46,19 @@ router → controller → external SDK
 
 This project has no database. The data flow is simpler than a CRUD API:
 
-| Layer        | Responsibility                                                   | Must not                       |
-| ------------ | ---------------------------------------------------------------- | ------------------------------ |
-| `router`     | Declare routes, attach `validate()` middleware                   | Contain logic                  |
-| `controller` | Read `req.body`, call SDK, map response, send JSON               | Call other controllers         |
-| `validation` | Zod schema — validates and strips unknown fields at router level | Contain business rules         |
-| `middleware` | Shared: error formatting, input validation                       | Contain gateway-specific logic |
+| Layer        | Responsibility                                                                    | Must not                       |
+| ------------ | --------------------------------------------------------------------------------- | ------------------------------ |
+| `router`     | Declare routes, attach `validate()` middleware, wrap handlers with `asyncHandler` | Contain logic                  |
+| `controller` | Read `req.body`, call SDK, map response, send JSON                                | Call other controllers         |
+| `validation` | Zod schema — validates and strips unknown fields at router level                  | Contain business rules         |
+| `middleware` | Shared: error formatting, input validation                                        | Contain gateway-specific logic |
 
 ## Request validation
 
 All routes apply `validate(schema)` before the controller runs:
 
 ```ts
-router.post("/charges", validate(chargesSchema), charges);
+router.post("/charges", validate(chargesSchema), asyncHandler(charges));
 ```
 
 Zod schemas export an inferred type used directly in controllers — no duplicate interface definitions:
@@ -87,7 +92,7 @@ throw GatewayError("Stripe returned an unexpected error");
 throw NotFoundError("Resource not found");
 ```
 
-Errors propagate to `errorGenericHandler` in `src/middleware/error.ts` via `next(err)`. Controllers never call `res.status().json()` for errors directly.
+Errors propagate to `errorGenericHandler` in `src/middleware/error.ts` via `next(err)` or through `asyncHandler`, which catches promise rejections automatically. Controllers never call `res.status().json()` for errors directly.
 
 Error responses follow a consistent shape:
 
@@ -97,9 +102,25 @@ Error responses follow a consistent shape:
 
 Stack traces are included only in non-production environments.
 
+## Logging
+
+`pino-http` in `src/app.ts` logs every request automatically. Logging is disabled when `NODE_ENV=test`. In development, logs are formatted with `pino-pretty`; in production, JSON output is written to stdout. The log level is controlled by `LOG_LEVEL` (default `info`).
+
+## Rate limiting
+
+`express-rate-limit` is applied globally in `src/app.ts` (disabled when `NODE_ENV=test`). Defaults: 60 requests per 1-minute window. Configure via `RATE_LIMIT_WINDOW_MINUTES` and `RATE_LIMIT_MAX`.
+
 ## Environment configuration
 
 All environment variables are declared and validated at startup in `src/config.ts`. Missing required variables cause an immediate process exit. Feature code imports named constants from `config.ts` — never reads `process.env` directly.
+
+| Variable                    | Required | Default | Description                  |
+| --------------------------- | -------- | ------- | ---------------------------- |
+| `STRIPE_PRIVATE_KEY`        | Yes      | —       | Stripe secret key            |
+| `PORT`                      | No       | `3000`  | HTTP port                    |
+| `RATE_LIMIT_WINDOW_MINUTES` | No       | `1`     | Rate limit window in minutes |
+| `RATE_LIMIT_MAX`            | No       | `60`    | Max requests per window      |
+| `LOG_LEVEL`                 | No       | `info`  | Pino log level               |
 
 ## Why no service or DAO layer
 

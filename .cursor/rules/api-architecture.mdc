@@ -9,7 +9,7 @@ Full reference: `ARCHITECTURE.md` at the project root. These rules are the actio
 
 ## Stack
 
-Node.js 24 · TypeScript (strict) · Express 5 · Zod · Stripe · ESLint · Prettier
+Node.js 24 · TypeScript (strict) · Express 5 · Zod · Stripe · Pino · express-rate-limit · ESLint · Prettier
 
 ## Layer flow — never skip or reverse
 
@@ -17,7 +17,7 @@ Node.js 24 · TypeScript (strict) · Express 5 · Zod · Stripe · ESLint · Pre
 router → controller → external SDK
 ```
 
-- **router**: routes + validation middleware only. Never contain logic.
+- **router**: routes + validation middleware only. Always wrap handlers: `asyncHandler(handler)`. Never contain logic.
 - **controller**: reads `req.body`, calls SDK, maps response, sends JSON. Nothing else.
 - **validation**: Zod schema applied at the router before the controller runs. Export the inferred type with `z.infer<>`.
 
@@ -49,7 +49,7 @@ Never `res.status(400).json(...)` directly from a controller. Let errors propaga
 Apply `validate(schema)` at the router before the controller:
 
 ```ts
-router.post("/charges", validate(chargesSchema), charges);
+router.post("/charges", validate(chargesSchema), asyncHandler(charges));
 ```
 
 Validation errors return `400` with a `details` array. Never validate inside the controller.
@@ -57,6 +57,13 @@ Validation errors return `400` with a `details` array. Never validate inside the
 ## Environment variables
 
 Declare and export from `src/config.ts`. Never read `process.env` directly in feature code.
+
+Optional vars with defaults: `RATE_LIMIT_WINDOW_MINUTES` (1), `RATE_LIMIT_MAX` (60), `LOG_LEVEL` (`info`).
+
+## Logging and rate limiting
+
+- `pino-http` logs every request in `src/app.ts`. Disabled when `NODE_ENV=test`. Pretty output in development only.
+- `express-rate-limit` protects the API globally. Disabled when `NODE_ENV=test`. Configure window and max via env vars.
 
 ## DO NOT
 
