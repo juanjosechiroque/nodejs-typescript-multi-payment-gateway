@@ -12,6 +12,7 @@ Built with Express 5, TypeScript, Zod validation, ESLint, and Prettier.
 - **Stripe** — card payments via PaymentIntents API
 - **ESLint + Prettier** — enforced style and static analysis
 - **Husky** — pre-commit validation hook
+- **CI/CD** — GitHub Actions validates and builds on `main`
 
 ## Requirements
 

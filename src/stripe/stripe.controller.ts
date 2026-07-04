@@ -4,7 +4,7 @@ import { STRIPE_PRIVATE_KEY } from "../config.js";
 import { GatewayError, BadRequestError } from "../errors.js";
 import type { ChargesBody } from "./stripe.validation.js";
 
-const stripe = new Stripe(STRIPE_PRIVATE_KEY, { apiVersion: "2022-11-15" });
+const stripe = new Stripe(STRIPE_PRIVATE_KEY, { apiVersion: "2026-06-24.dahlia" });
 
 export const charges = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { payment_method_id, amount, currency_code, customer_email, description, metadata } =
@@ -32,15 +32,14 @@ export const charges = async (req: Request, res: Response, next: NextFunction): 
             status: paymentIntent.status,
         });
     } catch (err) {
-        const stripeErr = err as Stripe.errors.StripeError;
-        if (stripeErr.type === "StripeCardError") {
-            next(GatewayError(stripeErr.message));
+        if (err instanceof Stripe.errors.StripeCardError) {
+            next(GatewayError(err.message));
             return;
         }
-        if (stripeErr.type === "StripeInvalidRequestError") {
-            const msg = stripeErr.param
-                ? `The parameter ${stripeErr.param} is invalid or missing`
-                : stripeErr.message;
+        if (err instanceof Stripe.errors.StripeInvalidRequestError) {
+            const msg = err.param
+                ? `The parameter ${err.param} is invalid or missing`
+                : err.message;
             next(BadRequestError(msg));
             return;
         }
