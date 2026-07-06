@@ -19,7 +19,12 @@ export const errorGenericHandler: ErrorRequestHandler = (err: unknown, _req, res
             ? "Internal server error"
             : (error.message ?? "Internal server error");
 
+    const errorWithDetails = error as Partial<AppError> & { details?: unknown };
     const response: Record<string, unknown> = { status, code, message };
+
+    if (errorWithDetails.details !== undefined) {
+        response.details = errorWithDetails.details;
+    }
 
     if (NODE_ENV !== "production" && error.stack) {
         response.stack = error.stack;
