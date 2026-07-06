@@ -38,5 +38,11 @@ jobs:
             - name: Typecheck
               run: npm run typecheck
 
+            - name: Test
+              run: npm test
+              env:
+                  NODE_ENV: test
+                  STRIPE_PRIVATE_KEY: sk_test_ci_mock
+
             - name: Build
               run: npm run build

@@ -86,9 +86,16 @@ Validation errors return `400` with a `details` array. Never validate inside the
 
 ## Environment variables
 
-Declare and export from `src/config.ts`. Never read `process.env` directly in feature code.
+Declare and validate environment variables with Zod in `src/config.ts`. Never read `process.env` directly in feature code.
 
 Optional vars with defaults: `RATE_LIMIT_WINDOW_MINUTES` (1), `RATE_LIMIT_MAX` (60), `LOG_LEVEL` (`info`).
+
+## Testing
+
+- E2E tests live under `tests/e2e`.
+- Use Supertest against the Express app; do not start the production server.
+- Mock external payment SDKs in tests so CI does not depend on external network calls or real provider credentials.
+- CI must run `npm run validate`, `npm run typecheck`, `npm test`, and `npm run build`.
 
 ## Logging and rate limiting
 

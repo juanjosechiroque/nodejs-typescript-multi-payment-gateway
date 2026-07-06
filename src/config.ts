@@ -1,21 +1,32 @@
+import { z } from "zod";
+
 if (process.env.NODE_ENV !== "production") {
     const dotenv = await import("dotenv");
     dotenv.config();
 }
 
-const env = process.env;
+const envSchema = z.object({
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    PORT: z.coerce.number().int().positive().default(3000),
+    STRIPE_PRIVATE_KEY: z.string().trim().min(1, "STRIPE_PRIVATE_KEY is required"),
+    RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().positive().default(1),
+    RATE_LIMIT_MAX: z.coerce.number().int().positive().default(60),
+    LOG_LEVEL: z.string().trim().min(1).default("info"),
+});
 
-const REQUIRED_ENV_VARS = ["STRIPE_PRIVATE_KEY"] as const;
+const parsedEnv = envSchema.safeParse(process.env);
 
-const missing = REQUIRED_ENV_VARS.filter((key) => !String(env[key] ?? "").trim());
-if (missing.length > 0) {
-    console.error(`Missing required environment variables: ${missing.join(", ")}`);
+if (!parsedEnv.success) {
+    console.error("Invalid environment configuration");
+    console.error(z.prettifyError(parsedEnv.error));
     process.exit(1);
 }
 
-export const PORT = Number(env.PORT) || 3000;
-export const NODE_ENV = env.NODE_ENV;
-export const STRIPE_PRIVATE_KEY = env.STRIPE_PRIVATE_KEY as string;
-export const RATE_LIMIT_WINDOW_MINUTES = Number(env.RATE_LIMIT_WINDOW_MINUTES) || 1;
-export const RATE_LIMIT_MAX = Number(env.RATE_LIMIT_MAX) || 60;
-export const LOG_LEVEL = env.LOG_LEVEL ?? "info";
+export const {
+    PORT,
+    NODE_ENV,
+    STRIPE_PRIVATE_KEY,
+    RATE_LIMIT_WINDOW_MINUTES,
+    RATE_LIMIT_MAX,
+    LOG_LEVEL,
+} = parsedEnv.data;

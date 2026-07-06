@@ -1,6 +1,50 @@
 import { randomUUID } from "crypto";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import request from "supertest";
+
+const { MockStripeCardError, MockStripeInvalidRequestError } = vi.hoisted(() => {
+    class MockStripeCardError extends Error {}
+
+    class MockStripeInvalidRequestError extends Error {
+        param?: string;
+    }
+
+    return { MockStripeCardError, MockStripeInvalidRequestError };
+});
+
+vi.mock("stripe", () => {
+    class MockStripe {
+        static errors = {
+            StripeCardError: MockStripeCardError,
+            StripeInvalidRequestError: MockStripeInvalidRequestError,
+        };
+
+        customers = {
+            list: vi.fn().mockResolvedValue({ data: [{ id: "cus_test" }] }),
+            create: vi.fn().mockResolvedValue({ id: "cus_test" }),
+        };
+
+        paymentIntents = {
+            create: vi.fn().mockImplementation((params: { payment_method: string }) => {
+                if (params.payment_method === "pm_card_chargeDeclined") {
+                    throw new MockStripeCardError("Your card was declined.");
+                }
+
+                if (params.payment_method === "pm_card_chargeDeclinedExpiredCard") {
+                    throw new MockStripeCardError("Your card has expired.");
+                }
+
+                return Promise.resolve({
+                    id: "pi_test",
+                    status: "succeeded",
+                });
+            }),
+        };
+    }
+
+    return { default: MockStripe };
+});
+
 import app from "../../src/app.js";
 
 interface ChargeResponse {

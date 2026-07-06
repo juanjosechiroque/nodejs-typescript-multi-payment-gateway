@@ -162,7 +162,7 @@ Stack traces are included only in non-production environments.
 
 ## Environment configuration
 
-All environment variables are declared and validated at startup in `src/config.ts`. Missing required variables cause an immediate process exit. Feature code imports named constants from `config.ts` — never reads `process.env` directly.
+All environment variables are declared and validated with Zod at startup in `src/config.ts`. Missing or invalid required variables cause an immediate process exit with a readable validation summary. Feature code imports named constants from `config.ts` — never reads `process.env` directly.
 
 | Variable                    | Required | Default | Description                  |
 | --------------------------- | -------- | ------- | ---------------------------- |

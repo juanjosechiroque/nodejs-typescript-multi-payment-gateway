@@ -2,7 +2,7 @@
 
 A **TypeScript REST API** that integrates multiple payment providers under a single unified interface using the **adapter pattern**.
 
-Built with Express 5, TypeScript, Zod validation, ESLint, and Prettier.
+Built with Express 5, TypeScript, Zod validation, Pino logging, ESLint, and Prettier.
 
 ## Stack
 
@@ -10,9 +10,10 @@ Built with Express 5, TypeScript, Zod validation, ESLint, and Prettier.
 - **Express 5** — HTTP layer
 - **Zod** — schema validation with typed inference
 - **Stripe** — card payments via PaymentIntents API (tokenized flow)
+- **Pino** — structured request and application logging
 - **ESLint + Prettier** — enforced style and static analysis
 - **Husky** — pre-commit validation hook
-- **CI/CD** — GitHub Actions validates and builds on `main`
+- **CI/CD** — GitHub Actions validates, tests, and builds on `main`
 
 ## Requirements
 
@@ -47,6 +48,7 @@ The API listens on `http://localhost:3000` by default.
 | `npm start`         | Start production server          |
 | `npm run build`     | Compile TypeScript to `dist/`    |
 | `npm run typecheck` | Type-check without emitting      |
+| `npm test`          | Run e2e tests with Vitest        |
 | `npm run validate`  | ESLint + Prettier check          |
 | `npm run format`    | Format + ESLint --fix            |
 
@@ -75,6 +77,12 @@ Returns server health status.
 #### `POST /api/payments/charge`
 
 Create a charge using a tokenized payment method. The `provider` field selects which gateway processes the payment.
+
+Required header:
+
+```http
+Idempotency-Key: 7f8f40e7-8f7a-4c0c-9f2f-4f20c62d3c62
+```
 
 **Request:**
 
@@ -112,6 +120,8 @@ Create a charge using a tokenized payment method. The `provider` field selects w
 | `customer_email` | string | Yes      | Customer email address                   |
 | `description`    | string | No       | Charge description                       |
 | `metadata`       | object | No       | Key-value string pairs                   |
+
+The `Idempotency-Key` header is required and must be a valid UUID. It is forwarded to Stripe so safe retries do not create duplicate charges.
 
 ### Testing without a frontend
 
@@ -153,6 +163,10 @@ Stack traces are included in non-production environments only.
 ## Architecture
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for layer responsibilities, folder structure, and design decisions.
+
+## Testing
+
+E2E tests use Vitest and Supertest. Stripe is mocked in the payments e2e suite so tests are deterministic and can run in CI without external network calls or real Stripe credentials.
 
 ## License
 
