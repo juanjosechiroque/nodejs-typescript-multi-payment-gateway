@@ -12,6 +12,10 @@ export const createCharge = asyncHandler(async (req: Request, res: Response) => 
     const idempotencyKey = Array.isArray(raw) ? raw[0] : raw;
     if (!idempotencyKey) throw BadRequestError("Idempotency-Key header is required");
 
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(idempotencyKey))
+        throw BadRequestError("Idempotency-Key must be a valid UUID");
+
     const result = await charge({
         provider,
         token,
