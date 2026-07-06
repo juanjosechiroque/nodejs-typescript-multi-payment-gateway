@@ -11,6 +11,7 @@ npm run dev           # development server
 npm run validate      # ESLint + Prettier check
 npm run typecheck     # TypeScript typecheck
 npm test              # e2e tests
+npm run test:coverage # coverage report
 npm run build         # compile TypeScript to dist/
 npm run format        # auto-fix
 ```

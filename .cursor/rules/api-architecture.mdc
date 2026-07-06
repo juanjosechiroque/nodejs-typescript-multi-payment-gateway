@@ -17,7 +17,7 @@ Node.js 24 · TypeScript (strict) · Express 5 · Zod · Stripe · PayPal · Pin
 router → controller → service → adapter → external SDK
 ```
 
-- **router**: routes + validation middleware only. Always wrap handlers: `asyncHandler(handler)`. Never contain logic.
+- **router**: routes + validation middleware only. Never contain logic.
 - **controller**: reads `req.body`, calls service, maps response, sends JSON. Never calls SDKs directly.
 - **service**: resolves the correct adapter capability from registry, delegates to charge/order operations.
 - **adapter**: translates provider-specific SDK/API calls into normalized payment results. Normalizes SDK/API errors into `GatewayError`/`BadRequestError`.
@@ -86,7 +86,7 @@ Never `res.status(400).json(...)` directly from a controller. Let errors propaga
 Apply `validate(schema)` at the router before the controller:
 
 ```ts
-router.post("/charge", validate(chargeSchema), asyncHandler(createCharge));
+router.post("/charge", validate(chargeSchema), createCharge);
 ```
 
 Validation errors return `400` with a `details` array. Never validate inside the controller.

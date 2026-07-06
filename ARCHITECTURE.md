@@ -25,12 +25,12 @@ src/
 │   ├── registry.ts            # Provider registry — maps names to charge/order adapter capabilities
 │   ├── paypal.client.ts       # PayPal REST client for OAuth, order creation, and capture
 │   ├── paypal.adapter.ts      # PayPal checkout order implementation
-│   └── stripe.adapter.ts      # Stripe implementation of PaymentAdapter
+│   └── stripe.adapter.ts      # Stripe direct charge implementation
 ├── payments/
 │   ├── payments.router.ts     # Route definitions + validation wiring
 │   ├── payments.controller.ts # HTTP layer: reads req, calls service, sends response
-│   ├── payments.service.ts    # Resolves adapter from registry, delegates charge
-│   └── payments.validation.ts # Zod schema + inferred ChargeBody type
+│   ├── payments.service.ts    # Resolves adapter capabilities from registry
+│   └── payments.validation.ts # Zod schemas + inferred request types
 ├── api/
 │   └── health/
 │       ├── health.router.ts
@@ -85,7 +85,7 @@ Stripe uses the direct charge capability. PayPal uses checkout order creation an
 2. Add `{name}: new {Name}Adapter()` to either `chargeAdapters` or `checkoutOrderAdapters` in `registry.ts`
 3. Add provider-specific client code only inside `src/adapters/`
 
-No router changes, no controller changes, no new routes.
+No router or controller changes are needed when adding a provider to an existing capability. New payment capabilities should add explicit routes instead of overloading an unrelated flow.
 
 ## Layer responsibilities and data flow
 
@@ -93,21 +93,21 @@ No router changes, no controller changes, no new routes.
 router → controller → service → adapter → external SDK/API
 ```
 
-| Layer        | Responsibility                                                                    | Must not                       |
-| ------------ | --------------------------------------------------------------------------------- | ------------------------------ |
-| `router`     | Declare routes, attach `validate()` middleware, wrap handlers with `asyncHandler` | Contain logic                  |
-| `controller` | Read `req.body`, call service, map response, send JSON                            | Call SDKs directly             |
-| `service`    | Resolve adapter capability from registry and delegate to it                       | Handle HTTP concerns           |
-| `adapter`    | Translate provider-specific SDK/API calls into normalized payment results         | Leak SDK-specific types        |
-| `validation` | Zod schema — validates and strips unknown fields at router level                  | Contain business rules         |
-| `middleware` | Shared: error formatting, input validation                                        | Contain gateway-specific logic |
+| Layer        | Responsibility                                                            | Must not                       |
+| ------------ | ------------------------------------------------------------------------- | ------------------------------ |
+| `router`     | Declare routes and attach route-level validation middleware               | Contain logic                  |
+| `controller` | Read `req.body`, call service, map response, send JSON                    | Call SDKs directly             |
+| `service`    | Resolve adapter capability from registry and delegate to it               | Handle HTTP concerns           |
+| `adapter`    | Translate provider-specific SDK/API calls into normalized payment results | Leak SDK-specific types        |
+| `validation` | Zod schema — validates and strips unknown fields at router level          | Contain business rules         |
+| `middleware` | Shared: error formatting, input validation                                | Contain gateway-specific logic |
 
 ## Request validation
 
 All routes apply `validate(schema)` before the controller runs:
 
 ```ts
-router.post("/charge", validate(chargeSchema), asyncHandler(createCharge));
+router.post("/charge", validate(chargeSchema), createCharge);
 ```
 
 Zod schemas export an inferred type used directly in controllers — no duplicate interface definitions:
@@ -141,7 +141,7 @@ throw GatewayError("Stripe returned an unexpected error");
 throw NotFoundError("Resource not found");
 ```
 
-Errors propagate to `errorGenericHandler` in `src/middleware/error.ts` via `next(err)` or through `asyncHandler`, which catches promise rejections automatically. Controllers never call `res.status().json()` for errors directly.
+Errors propagate to `errorGenericHandler` in `src/middleware/error.ts` via `next(err)` or through controller handlers wrapped with `asyncHandler`, which catches promise rejections automatically. Controllers never call `res.status().json()` for errors directly.
 
 Adapters are responsible for normalizing SDK errors into typed errors before they reach the controller:
 
@@ -152,6 +152,8 @@ Adapters are responsible for normalizing SDK errors into typed errors before the
     throw GatewayError("Stripe returned an unexpected error");
 }
 ```
+
+REST provider clients follow the same boundary. For example, PayPal OAuth, order creation, capture requests, HTTP errors, and `PayPal-Request-Id` handling stay inside `paypal.client.ts` / `paypal.adapter.ts`; controllers and services only see typed application errors and normalized payment results.
 
 Error responses follow a consistent shape:
 
@@ -167,7 +169,7 @@ Stack traces are included only in non-production environments.
 
 ## Testing
 
-E2E tests live under `tests/e2e` and are written in a BDD-style `Given/When/Then` structure where it helps readability. External payment providers are mocked so CI does not depend on network calls or real provider credentials.
+E2E tests live under `tests/e2e` and are written in a BDD-style `Given/When/Then` structure where it helps readability. External payment providers are mocked so CI does not depend on network calls or real provider credentials. CI runs `npm test`; coverage is available as a local/manual check with `npm run test:coverage`.
 
 ## Rate limiting
 
@@ -177,13 +179,13 @@ E2E tests live under `tests/e2e` and are written in a BDD-style `Given/When/Then
 
 All environment variables are declared and validated with Zod at startup in `src/config.ts`. Missing or invalid required variables cause an immediate process exit with a readable validation summary. Feature code imports named constants from `config.ts` — never reads `process.env` directly.
 
-| Variable                    | Required | Default   | Description                  |
-| --------------------------- | -------- | --------- | ---------------------------- |
-| `STRIPE_PRIVATE_KEY`        | Yes      | —         | Stripe secret key            |
-| `PAYPAL_CLIENT_ID`          | No       | —         | PayPal client id             |
-| `PAYPAL_CLIENT_SECRET`      | No       | —         | PayPal client secret         |
-| `PAYPAL_ENVIRONMENT`        | No       | `sandbox` | PayPal environment           |
-| `PORT`                      | No       | `3000`    | HTTP port                    |
-| `RATE_LIMIT_WINDOW_MINUTES` | No       | `1`       | Rate limit window in minutes |
-| `RATE_LIMIT_MAX`            | No       | `60`      | Max requests per window      |
-| `LOG_LEVEL`                 | No       | `info`    | Pino log level               |
+| Variable                    | Required | Default   | Description                                                    |
+| --------------------------- | -------- | --------- | -------------------------------------------------------------- |
+| `STRIPE_PRIVATE_KEY`        | Yes      | —         | Stripe secret key                                              |
+| `PAYPAL_CLIENT_ID`          | No       | —         | PayPal client id, required only when using PayPal manually     |
+| `PAYPAL_CLIENT_SECRET`      | No       | —         | PayPal client secret, required only when using PayPal manually |
+| `PAYPAL_ENVIRONMENT`        | No       | `sandbox` | PayPal environment                                             |
+| `PORT`                      | No       | `3000`    | HTTP port                                                      |
+| `RATE_LIMIT_WINDOW_MINUTES` | No       | `1`       | Rate limit window in minutes                                   |
+| `RATE_LIMIT_MAX`            | No       | `60`      | Max requests per window                                        |
+| `LOG_LEVEL`                 | No       | `info`    | Pino log level                                                 |

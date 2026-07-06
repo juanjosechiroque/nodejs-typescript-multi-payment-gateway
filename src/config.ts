@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { GatewayError } from "./errors.js";
 
 if (process.env.NODE_ENV !== "production") {
     const dotenv = await import("dotenv");
@@ -39,7 +40,7 @@ export const {
 
 export function getPayPalConfig() {
     if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
-        throw new Error("PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET are required to use PayPal");
+        throw GatewayError("PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET are required to use PayPal");
     }
 
     return {

@@ -20,7 +20,9 @@ Built with Express 5, TypeScript, Zod validation, Pino logging, ESLint, and Pret
 
 - Node.js 24+ (use `.nvmrc` with `nvm use`)
 - npm
-- A [Stripe account](https://stripe.com) — free, test mode available
+- Provider sandbox credentials for the flows you want to run manually:
+    - [Stripe](https://stripe.com) for direct charges
+    - [PayPal Developer](https://developer.paypal.com/) for checkout orders
 
 ## Quick Start
 
@@ -43,6 +45,8 @@ The API listens on `http://localhost:3000` by default.
 | `PAYPAL_CLIENT_ID`     | No       | PayPal client id, required only when using `provider: "paypal"`     |
 | `PAYPAL_CLIENT_SECRET` | No       | PayPal client secret, required only when using `provider: "paypal"` |
 | `PAYPAL_ENVIRONMENT`   | No       | `sandbox` or `production` (default `sandbox`)                       |
+
+`STRIPE_PRIVATE_KEY` is required at startup because Stripe is the default direct-charge provider. PayPal credentials are only required when using the PayPal checkout order flow manually. Tests mock external providers, so CI uses a mock Stripe key and does not require real Stripe or PayPal credentials.
 
 ## Available Scripts
 
@@ -230,6 +234,12 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for layer responsibilities, folder stru
 ## Testing
 
 E2E tests use Vitest and Supertest with a BDD-style structure. Stripe and PayPal clients are mocked in the payments e2e suites so tests are deterministic and can run in CI without external network calls or real provider credentials.
+
+Run coverage locally with:
+
+```bash
+npm run test:coverage
+```
 
 ## License
 
