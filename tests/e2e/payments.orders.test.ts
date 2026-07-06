@@ -120,10 +120,60 @@ describe("PayPal checkout order flow", () => {
         });
     });
 
+    describe("Given a PayPal order request with invalid payment data", () => {
+        describe("When the amount is below the minimum of 0.50", () => {
+            it("Then returns 400 with validation details", async () => {
+                const res = await postOrder({ ...validOrderBody, amount: 0.1 });
+                const body = res.body as ErrorResponse;
+
+                expect(res.status).toBe(400);
+                expect(body.code).toBe("BadRequestError");
+                expect(body.details?.some((d) => d.field === "amount")).toBe(true);
+            });
+        });
+
+        describe("When the currency is not a 3-character code", () => {
+            it("Then returns 400 with validation details", async () => {
+                const res = await postOrder({ ...validOrderBody, currency: "DOLLARS" });
+                const body = res.body as ErrorResponse;
+
+                expect(res.status).toBe(400);
+                expect(body.code).toBe("BadRequestError");
+                expect(body.details?.some((d) => d.field === "currency")).toBe(true);
+            });
+        });
+
+        describe("When the customer_email is not a valid email", () => {
+            it("Then returns 400 with validation details", async () => {
+                const res = await postOrder({ ...validOrderBody, customer_email: "not-an-email" });
+                const body = res.body as ErrorResponse;
+
+                expect(res.status).toBe(400);
+                expect(body.code).toBe("BadRequestError");
+                expect(body.details?.some((d) => d.field === "customer_email")).toBe(true);
+            });
+        });
+    });
+
     describe("Given an unsupported checkout order provider", () => {
         describe("When the client creates a checkout order", () => {
             it("Then returns 400 with BadRequestError", async () => {
                 const res = await postOrder({ ...validOrderBody, provider: "stripe" });
+                const body = res.body as ErrorResponse;
+
+                expect(res.status).toBe(400);
+                expect(body.code).toBe("BadRequestError");
+                expect(body.message).toMatch(/Unsupported checkout order provider/);
+            });
+        });
+    });
+
+    describe("Given an unsupported checkout capture provider", () => {
+        describe("When the client captures the order", () => {
+            it("Then returns 400 with BadRequestError", async () => {
+                const res = await request(app)
+                    .post("/api/payments/orders/stripe/ORDER_123/capture")
+                    .set("Idempotency-Key", randomUUID());
                 const body = res.body as ErrorResponse;
 
                 expect(res.status).toBe(400);
@@ -169,6 +219,24 @@ describe("PayPal checkout order flow", () => {
                 expect(body.provider).toBe("paypal");
                 expect(body.charge_id).toBe("PAYPAL_ORDER_PENDING");
                 expect(body.status).toBe("pending");
+            });
+        });
+    });
+
+    describe("Given a PayPal order that is declined during capture", () => {
+        describe("When the client captures the order", () => {
+            it("Then returns 502 with GatewayError", async () => {
+                paypalMocks.captureOrder.mockResolvedValueOnce({
+                    id: "PAYPAL_ORDER_DECLINED",
+                    status: "DECLINED",
+                });
+
+                const res = await captureOrder("PAYPAL_ORDER_DECLINED");
+                const body = res.body as ErrorResponse;
+
+                expect(res.status).toBe(502);
+                expect(body.code).toBe("GatewayError");
+                expect(body.message).toMatch(/DECLINED/);
             });
         });
     });
