@@ -2,6 +2,8 @@
 
 Architecture, patterns, and conventions are documented in [`ARCHITECTURE.md`](./ARCHITECTURE.md). Read it before making any changes.
 
+Provider capabilities are intentionally separated: Stripe uses direct charges, while PayPal uses checkout order creation and capture. Do not force all gateways into a single charge-only contract.
+
 ## Commands
 
 ```bash

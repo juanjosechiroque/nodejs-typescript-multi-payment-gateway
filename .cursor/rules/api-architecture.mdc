@@ -9,7 +9,7 @@ Full reference: `ARCHITECTURE.md` at the project root. These rules are the actio
 
 ## Stack
 
-Node.js 24 · TypeScript (strict) · Express 5 · Zod · Stripe · Pino · express-rate-limit · ESLint · Prettier
+Node.js 24 · TypeScript (strict) · Express 5 · Zod · Stripe · PayPal · Pino · express-rate-limit · ESLint · Prettier
 
 ## Layer flow — never skip or reverse
 
@@ -19,36 +19,43 @@ router → controller → service → adapter → external SDK
 
 - **router**: routes + validation middleware only. Always wrap handlers: `asyncHandler(handler)`. Never contain logic.
 - **controller**: reads `req.body`, calls service, maps response, sends JSON. Never calls SDKs directly.
-- **service**: resolves adapter from registry (`getAdapter(provider)`), delegates to `adapter.charge()`.
-- **adapter**: translates `ChargeInput` → SDK call → `ChargeResult`. Normalizes SDK errors into `GatewayError`/`BadRequestError`.
+- **service**: resolves the correct adapter capability from registry, delegates to charge/order operations.
+- **adapter**: translates provider-specific SDK/API calls into normalized payment results. Normalizes SDK/API errors into `GatewayError`/`BadRequestError`.
 - **validation**: Zod schema applied at the router before the controller runs. Export the inferred type with `z.infer<>`.
 
 ## Adapter pattern
 
-All payment providers implement `PaymentAdapter` from `src/adapters/payment.adapter.ts`:
+Payment providers implement the capability interface that matches their real flow from `src/adapters/payment.adapter.ts`:
 
 ```ts
-interface PaymentAdapter {
+interface DirectChargeAdapter {
     charge(input: ChargeInput): Promise<ChargeResult>;
+}
+
+interface CheckoutOrderAdapter {
+    createOrder(input: CreateOrderInput): Promise<CreateOrderResult>;
+    captureOrder(input: CaptureOrderInput): Promise<ChargeResult>;
 }
 ```
 
 The registry (`src/adapters/registry.ts`) is the single source of truth:
 
 ```ts
-const adapters: Record<string, PaymentAdapter> = {
+const chargeAdapters: Record<string, DirectChargeAdapter> = {
     stripe: new StripeAdapter(),
-    // add new providers here
 };
-export const SUPPORTED_PROVIDERS = Object.keys(adapters);
+
+const checkoutOrderAdapters: Record<string, CheckoutOrderAdapter> = {
+    paypal: new PayPalAdapter(),
+};
 ```
 
-`SUPPORTED_PROVIDERS` is imported into the Zod schema — adding a provider to the registry automatically makes it available in validation. No router or controller changes needed.
+Stripe uses direct charge. PayPal uses checkout order creation and capture. Do not force order-based providers into the direct charge contract.
 
 ## When adding a new gateway
 
-1. Create `src/adapters/{name}.adapter.ts` implementing `PaymentAdapter`
-2. Add `{name}: new {Name}Adapter()` to the `adapters` map in `src/adapters/registry.ts`
+1. Create `src/adapters/{name}.adapter.ts` implementing the right capability interface
+2. Add `{name}: new {Name}Adapter()` to the right capability map in `src/adapters/registry.ts`
 3. Wrap all SDK calls in try/catch and normalize errors (see Error handling below)
 
 Do NOT create new routers, controllers, or routes per gateway.

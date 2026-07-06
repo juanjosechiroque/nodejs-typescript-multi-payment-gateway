@@ -10,7 +10,7 @@ This document describes the structure, conventions, and design decisions behind 
 | Language      | TypeScript (strict) |
 | Framework     | Express 5           |
 | Validation    | Zod                 |
-| Gateways      | Stripe              |
+| Gateways      | Stripe + PayPal     |
 | Logging       | Pino + pino-http    |
 | Rate limiting | express-rate-limit  |
 | Code quality  | ESLint + Prettier   |
@@ -21,8 +21,10 @@ This document describes the structure, conventions, and design decisions behind 
 ```
 src/
 ├── adapters/
-│   ├── payment.adapter.ts     # PaymentAdapter interface + ChargeInput/ChargeResult types
-│   ├── registry.ts            # Provider registry — maps name → adapter instance; exports SUPPORTED_PROVIDERS
+│   ├── payment.adapter.ts     # Adapter capability interfaces + shared payment result types
+│   ├── registry.ts            # Provider registry — maps names to charge/order adapter capabilities
+│   ├── paypal.client.ts       # PayPal REST client for OAuth, order creation, and capture
+│   ├── paypal.adapter.ts      # PayPal checkout order implementation
 │   └── stripe.adapter.ts      # Stripe implementation of PaymentAdapter
 ├── payments/
 │   ├── payments.router.ts     # Route definitions + validation wiring
@@ -50,46 +52,53 @@ index.ts                       # Server entrypoint
 
 ## Adapter pattern
 
-This project uses the **adapter pattern** to decouple the HTTP layer from any specific payment SDK. Each gateway implements the same `PaymentAdapter` interface:
+This project uses the **adapter pattern** to decouple the HTTP layer from any specific payment SDK or REST API. Providers implement the capability interface that matches their real payment flow:
 
 ```ts
-interface PaymentAdapter {
+interface DirectChargeAdapter {
     charge(input: ChargeInput): Promise<ChargeResult>;
+}
+
+interface CheckoutOrderAdapter {
+    createOrder(input: CreateOrderInput): Promise<CreateOrderResult>;
+    captureOrder(input: CaptureOrderInput): Promise<ChargeResult>;
 }
 ```
 
 The **registry** (`src/adapters/registry.ts`) is the single source of truth for available providers:
 
 ```ts
-const adapters: Record<string, PaymentAdapter> = {
+const chargeAdapters: Record<string, DirectChargeAdapter> = {
     stripe: new StripeAdapter(),
 };
-export const SUPPORTED_PROVIDERS = Object.keys(adapters);
-export function getAdapter(provider: string): PaymentAdapter { ... }
+
+const checkoutOrderAdapters: Record<string, CheckoutOrderAdapter> = {
+    paypal: new PayPalAdapter(),
+};
 ```
 
-`SUPPORTED_PROVIDERS` is imported directly into the Zod schema so validation and the registry stay in sync automatically — no duplication.
+Stripe uses the direct charge capability. PayPal uses checkout order creation and capture because its normal checkout flow requires customer approval before capture.
 
 ### Adding a new provider
 
-1. Create `src/adapters/{name}.adapter.ts` implementing `PaymentAdapter`
-2. Add `{name}: new {Name}Adapter()` to the `adapters` map in `registry.ts`
-3. Done — the new provider is automatically validated by Zod and routable
+1. Create `src/adapters/{name}.adapter.ts` implementing the right capability interface
+2. Add `{name}: new {Name}Adapter()` to either `chargeAdapters` or `checkoutOrderAdapters` in `registry.ts`
+3. Add provider-specific client code only inside `src/adapters/`
 
 No router changes, no controller changes, no new routes.
 
 ## Layer responsibilities and data flow
 
 ```
-router → controller → service → adapter → external SDK
+router → controller → service → adapter → external SDK/API
 ```
 
 | Layer        | Responsibility                                                                    | Must not                       |
 | ------------ | --------------------------------------------------------------------------------- | ------------------------------ |
 | `router`     | Declare routes, attach `validate()` middleware, wrap handlers with `asyncHandler` | Contain logic                  |
 | `controller` | Read `req.body`, call service, map response, send JSON                            | Call SDKs directly             |
-| `service`    | Resolve adapter from registry, delegate to `adapter.charge()`                     | Handle HTTP concerns           |
-| `adapter`    | Translate `ChargeInput` → SDK call → `ChargeResult`; normalize SDK errors         | Leak SDK-specific types        |
+| `service`    | Resolve adapter capability from registry and delegate to it                       | Handle HTTP concerns           |
+| `adapter`    | Translate provider-specific SDK/API calls into normalized payment results         | Leak SDK-specific types        |
 | `validation` | Zod schema — validates and strips unknown fields at router level                  | Contain business rules         |
 | `middleware` | Shared: error formatting, input validation                                        | Contain gateway-specific logic |
 
@@ -156,6 +165,10 @@ Stack traces are included only in non-production environments.
 
 `pino-http` in `src/app.ts` logs every request automatically. Logging is disabled when `NODE_ENV=test`. In development, logs are formatted with `pino-pretty`; in production, JSON output is written to stdout. The log level is controlled by `LOG_LEVEL` (default `info`).
 
+## Testing
+
+E2E tests live under `tests/e2e` and are written in a BDD-style `Given/When/Then` structure where it helps readability. External payment providers are mocked so CI does not depend on network calls or real provider credentials.
+
 ## Rate limiting
 
 `express-rate-limit` is applied globally in `src/app.ts` (disabled when `NODE_ENV=test`). Defaults: 60 requests per 1-minute window. Configure via `RATE_LIMIT_WINDOW_MINUTES` and `RATE_LIMIT_MAX`.
@@ -164,10 +177,13 @@ Stack traces are included only in non-production environments.
 
 All environment variables are declared and validated with Zod at startup in `src/config.ts`. Missing or invalid required variables cause an immediate process exit with a readable validation summary. Feature code imports named constants from `config.ts` — never reads `process.env` directly.
 
-| Variable                    | Required | Default | Description                  |
-| --------------------------- | -------- | ------- | ---------------------------- |
-| `STRIPE_PRIVATE_KEY`        | Yes      | —       | Stripe secret key            |
-| `PORT`                      | No       | `3000`  | HTTP port                    |
-| `RATE_LIMIT_WINDOW_MINUTES` | No       | `1`     | Rate limit window in minutes |
-| `RATE_LIMIT_MAX`            | No       | `60`    | Max requests per window      |
-| `LOG_LEVEL`                 | No       | `info`  | Pino log level               |
+| Variable                    | Required | Default   | Description                  |
+| --------------------------- | -------- | --------- | ---------------------------- |
+| `STRIPE_PRIVATE_KEY`        | Yes      | —         | Stripe secret key            |
+| `PAYPAL_CLIENT_ID`          | No       | —         | PayPal client id             |
+| `PAYPAL_CLIENT_SECRET`      | No       | —         | PayPal client secret         |
+| `PAYPAL_ENVIRONMENT`        | No       | `sandbox` | PayPal environment           |
+| `PORT`                      | No       | `3000`    | HTTP port                    |
+| `RATE_LIMIT_WINDOW_MINUTES` | No       | `1`       | Rate limit window in minutes |
+| `RATE_LIMIT_MAX`            | No       | `60`      | Max requests per window      |
+| `LOG_LEVEL`                 | No       | `info`    | Pino log level               |

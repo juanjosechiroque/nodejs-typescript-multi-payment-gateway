@@ -9,7 +9,8 @@ Built with Express 5, TypeScript, Zod validation, Pino logging, ESLint, and Pret
 - **TypeScript** — strict mode, ESM, Node.js 24+
 - **Express 5** — HTTP layer
 - **Zod** — schema validation with typed inference
-- **Stripe** — card payments via PaymentIntents API (tokenized flow)
+- **Stripe** — direct card charges via PaymentIntents API (tokenized flow)
+- **PayPal** — checkout order creation and capture flow
 - **Pino** — structured request and application logging
 - **ESLint + Prettier** — enforced style and static analysis
 - **Husky** — pre-commit validation hook
@@ -35,10 +36,13 @@ The API listens on `http://localhost:3000` by default.
 
 ## Environment Variables
 
-| Variable             | Required | Description                                        |
-| -------------------- | -------- | -------------------------------------------------- |
-| `PORT`               | No       | HTTP port (default `3000`)                         |
-| `STRIPE_PRIVATE_KEY` | **Yes**  | Stripe secret key (`sk_test_...` or `sk_live_...`) |
+| Variable               | Required | Description                                                         |
+| ---------------------- | -------- | ------------------------------------------------------------------- |
+| `PORT`                 | No       | HTTP port (default `3000`)                                          |
+| `STRIPE_PRIVATE_KEY`   | **Yes**  | Stripe secret key (`sk_test_...` or `sk_live_...`)                  |
+| `PAYPAL_CLIENT_ID`     | No       | PayPal client id, required only when using `provider: "paypal"`     |
+| `PAYPAL_CLIENT_SECRET` | No       | PayPal client secret, required only when using `provider: "paypal"` |
+| `PAYPAL_ENVIRONMENT`   | No       | `sandbox` or `production` (default `sandbox`)                       |
 
 ## Available Scripts
 
@@ -76,7 +80,7 @@ Returns server health status.
 
 #### `POST /api/payments/charge`
 
-Create a charge using a tokenized payment method. The `provider` field selects which gateway processes the payment.
+Create a direct charge using a tokenized payment method. This flow is used by providers that can authorize and confirm the payment server-side, such as Stripe.
 
 Required header:
 
@@ -123,6 +127,65 @@ Idempotency-Key: 7f8f40e7-8f7a-4c0c-9f2f-4f20c62d3c62
 
 The `Idempotency-Key` header is required and must be a valid UUID. It is forwarded to Stripe so safe retries do not create duplicate charges.
 
+#### `POST /api/payments/orders`
+
+Create a checkout order for providers that require customer approval before capture, such as PayPal.
+
+Required header:
+
+```http
+Idempotency-Key: 7f8f40e7-8f7a-4c0c-9f2f-4f20c62d3c62
+```
+
+**Request:**
+
+```json
+{
+    "provider": "paypal",
+    "amount": 100.0,
+    "currency": "USD",
+    "customer_email": "user@example.com",
+    "description": "Order #1234"
+}
+```
+
+**Response:**
+
+```json
+{
+    "provider": "paypal",
+    "provider_order_id": "5O190127TN364715T",
+    "status": "pending",
+    "amount": 100.0,
+    "currency": "USD",
+    "approval_url": "https://www.paypal.com/checkoutnow?token=..."
+}
+```
+
+#### `POST /api/payments/orders/:provider/:providerOrderId/capture`
+
+Capture a checkout order after the customer approves it with the provider.
+
+Required header:
+
+```http
+Idempotency-Key: 7f8f40e7-8f7a-4c0c-9f2f-4f20c62d3c62
+```
+
+**Response:**
+
+```json
+{
+    "provider": "paypal",
+    "charge_id": "2GG279541U471931P",
+    "status": "succeeded",
+    "amount": 100.0,
+    "currency": "USD"
+}
+```
+
+The same public API supports different provider capabilities: Stripe uses the direct charge flow, while PayPal uses checkout order creation and capture.
+
 ### Testing without a frontend
 
 Use these Stripe test payment method tokens in the `token` field:
@@ -166,7 +229,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for layer responsibilities, folder stru
 
 ## Testing
 
-E2E tests use Vitest and Supertest. Stripe is mocked in the payments e2e suite so tests are deterministic and can run in CI without external network calls or real Stripe credentials.
+E2E tests use Vitest and Supertest with a BDD-style structure. Stripe and PayPal clients are mocked in the payments e2e suites so tests are deterministic and can run in CI without external network calls or real provider credentials.
 
 ## License
 
