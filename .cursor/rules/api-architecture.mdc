@@ -14,24 +14,44 @@ Node.js 24 · TypeScript (strict) · Express 5 · Zod · Stripe · Pino · expre
 ## Layer flow — never skip or reverse
 
 ```
-router → controller → external SDK
+router → controller → service → adapter → external SDK
 ```
 
 - **router**: routes + validation middleware only. Always wrap handlers: `asyncHandler(handler)`. Never contain logic.
-- **controller**: reads `req.body`, calls SDK, maps response, sends JSON. Nothing else.
+- **controller**: reads `req.body`, calls service, maps response, sends JSON. Never calls SDKs directly.
+- **service**: resolves adapter from registry (`getAdapter(provider)`), delegates to `adapter.charge()`.
+- **adapter**: translates `ChargeInput` → SDK call → `ChargeResult`. Normalizes SDK errors into `GatewayError`/`BadRequestError`.
 - **validation**: Zod schema applied at the router before the controller runs. Export the inferred type with `z.infer<>`.
+
+## Adapter pattern
+
+All payment providers implement `PaymentAdapter` from `src/adapters/payment.adapter.ts`:
+
+```ts
+interface PaymentAdapter {
+    charge(input: ChargeInput): Promise<ChargeResult>;
+}
+```
+
+The registry (`src/adapters/registry.ts`) is the single source of truth:
+
+```ts
+const adapters: Record<string, PaymentAdapter> = {
+    stripe: new StripeAdapter(),
+    // add new providers here
+};
+export const SUPPORTED_PROVIDERS = Object.keys(adapters);
+```
+
+`SUPPORTED_PROVIDERS` is imported into the Zod schema — adding a provider to the registry automatically makes it available in validation. No router or controller changes needed.
 
 ## When adding a new gateway
 
-Create files under `src/{gateway}/`:
+1. Create `src/adapters/{name}.adapter.ts` implementing `PaymentAdapter`
+2. Add `{name}: new {Name}Adapter()` to the `adapters` map in `src/adapters/registry.ts`
+3. Wrap all SDK calls in try/catch and normalize errors (see Error handling below)
 
-```
-{gateway}/{gateway}.routes.ts
-{gateway}/{gateway}.controller.ts
-{gateway}/{gateway}.validation.ts   # Zod schema + exported inferred type
-```
-
-Register the router in `src/routes/index.ts`.
+Do NOT create new routers, controllers, or routes per gateway.
 
 ## Errors
 
@@ -39,7 +59,17 @@ Use typed factories from `src/errors.ts`:
 
 ```ts
 throw BadRequestError("Invalid card");
-throw GatewayError("Stripe returned an unexpected error");
+throw GatewayError("Provider returned an unexpected error");
+```
+
+Adapters must catch SDK errors and rethrow as typed errors:
+
+```ts
+} catch (err) {
+    if (err instanceof Stripe.errors.StripeCardError) throw GatewayError(err.message);
+    if (err instanceof Stripe.errors.StripeInvalidRequestError) throw BadRequestError(...);
+    throw GatewayError("Stripe returned an unexpected error");
+}
 ```
 
 Never `res.status(400).json(...)` directly from a controller. Let errors propagate to `errorGenericHandler` in `src/middleware/error.ts`.
@@ -49,7 +79,7 @@ Never `res.status(400).json(...)` directly from a controller. Let errors propaga
 Apply `validate(schema)` at the router before the controller:
 
 ```ts
-router.post("/charges", validate(chargesSchema), asyncHandler(charges));
+router.post("/charge", validate(chargeSchema), asyncHandler(createCharge));
 ```
 
 Validation errors return `400` with a `details` array. Never validate inside the controller.
@@ -69,5 +99,6 @@ Optional vars with defaults: `RATE_LIMIT_WINDOW_MINUTES` (1), `RATE_LIMIT_MAX` (
 
 - Validate input inside a controller
 - Read `process.env` outside `src/config.ts`
-- Create shared `controllers/` or `routes/` folders for gateway-specific code
-- Return raw SDK responses without mapping to a clean shape
+- Create per-gateway routers or controllers — use the adapter pattern
+- Return raw SDK responses without mapping to `ChargeResult`
+- Let SDK-specific error types leak outside an adapter's try/catch

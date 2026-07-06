@@ -9,7 +9,7 @@ Built with Express 5, TypeScript, Zod validation, ESLint, and Prettier.
 - **TypeScript** — strict mode, ESM, Node.js 24+
 - **Express 5** — HTTP layer
 - **Zod** — schema validation with typed inference
-- **Stripe** — card payments via PaymentIntents API
+- **Stripe** — card payments via PaymentIntents API (tokenized flow)
 - **ESLint + Prettier** — enforced style and static analysis
 - **Husky** — pre-commit validation hook
 - **CI/CD** — GitHub Actions validates and builds on `main`
@@ -54,19 +54,36 @@ The API listens on `http://localhost:3000` by default.
 
 All routes are mounted under `/api`.
 
-### Stripe
+### Health
 
-#### `POST /api/stripe/charges`
+#### `GET /api/health`
 
-Create a card charge using a tokenized payment method from Stripe.js.
+Returns server health status.
+
+**Response:**
+
+```json
+{
+    "status": "healthy",
+    "uptime": 42.3,
+    "timestamp": "2026-07-06T00:00:00.000Z"
+}
+```
+
+### Payments
+
+#### `POST /api/payments/charge`
+
+Create a charge using a tokenized payment method. The `provider` field selects which gateway processes the payment.
 
 **Request:**
 
 ```json
 {
-    "payment_method_id": "pm_card_visa",
+    "provider": "stripe",
+    "token": "pm_card_visa",
     "amount": 100.0,
-    "currency_code": "USD",
+    "currency": "USD",
     "customer_email": "user@example.com",
     "description": "Order #1234"
 }
@@ -76,16 +93,31 @@ Create a card charge using a tokenized payment method from Stripe.js.
 
 ```json
 {
+    "provider": "stripe",
     "charge_id": "pi_xxx",
-    "status": "succeeded"
+    "status": "succeeded",
+    "amount": 100.0,
+    "currency": "USD"
 }
 ```
 
+**Fields:**
+
+| Field            | Type   | Required | Description                              |
+| ---------------- | ------ | -------- | ---------------------------------------- |
+| `provider`       | string | Yes      | Payment provider (`stripe`)              |
+| `token`          | string | Yes      | Tokenized payment method from the client |
+| `amount`         | number | Yes      | Charge amount (positive, in major units) |
+| `currency`       | string | Yes      | ISO 4217 currency code (e.g. `USD`)      |
+| `customer_email` | string | Yes      | Customer email address                   |
+| `description`    | string | No       | Charge description                       |
+| `metadata`       | object | No       | Key-value string pairs                   |
+
 ### Testing without a frontend
 
-Use these Stripe test payment method IDs in the request body:
+Use these Stripe test payment method tokens in the `token` field:
 
-| `payment_method_id`         | Result             |
+| `token`                     | Result             |
 | --------------------------- | ------------------ |
 | `pm_card_visa`              | Success            |
 | `pm_card_mastercard`        | Success            |
@@ -107,6 +139,13 @@ All errors follow a consistent shape:
     ]
 }
 ```
+
+| Status | Code              | When                                    |
+| ------ | ----------------- | --------------------------------------- |
+| 400    | `BadRequestError` | Validation failure or invalid parameter |
+| 404    | `NotFoundError`   | Route not found                         |
+| 429    | —                 | Rate limit exceeded                     |
+| 502    | `GatewayError`    | Payment provider returned an error      |
 
 Stack traces are included in non-production environments only.
 
