@@ -7,10 +7,13 @@ const client = new Stripe(STRIPE_PRIVATE_KEY, { apiVersion: "2026-06-24.dahlia" 
 
 export class StripeAdapter implements PaymentAdapter {
     async charge(input: ChargeInput): Promise<ChargeResult> {
-        const { token, amount, currency, customer_email, description, metadata } = input;
+        const { token, amount, currency, customer_email, description, metadata, idempotencyKey } =
+            input;
 
         try {
-            const customer = await client.customers.create({ email: customer_email });
+            const existing = await client.customers.list({ email: customer_email, limit: 1 });
+            const customer =
+                existing.data[0] ?? (await client.customers.create({ email: customer_email }));
 
             const intentParams: Stripe.PaymentIntentCreateParams = {
                 payment_method: token,
@@ -24,7 +27,9 @@ export class StripeAdapter implements PaymentAdapter {
             if (description !== undefined) intentParams.description = description;
             if (metadata !== undefined) intentParams.metadata = metadata;
 
-            const intent = await client.paymentIntents.create(intentParams);
+            const intent = await client.paymentIntents.create(intentParams, {
+                idempotencyKey,
+            });
 
             return {
                 provider: "stripe",

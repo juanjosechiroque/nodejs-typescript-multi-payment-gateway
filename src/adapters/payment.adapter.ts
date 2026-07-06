@@ -5,12 +5,13 @@ export interface ChargeInput {
     customer_email: string;
     description?: string;
     metadata?: Record<string, string>;
+    idempotencyKey: string;
 }
 
 export interface ChargeResult {
     provider: string;
     charge_id: string;
-    status: "succeeded" | "pending" | "failed";
+    status: "succeeded" | "pending";
     amount: number;
     currency: string;
 }
