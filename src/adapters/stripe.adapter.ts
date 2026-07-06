@@ -41,10 +41,9 @@ export class StripeAdapter implements PaymentAdapter {
         } catch (err) {
             if (err instanceof Stripe.errors.StripeCardError) throw GatewayError(err.message);
             if (err instanceof Stripe.errors.StripeInvalidRequestError) {
-                const msg = err.param
-                    ? `The parameter ${err.param} is invalid or missing`
-                    : err.message;
-                throw BadRequestError(msg);
+                if (err.param)
+                    throw BadRequestError(`The parameter ${err.param} is invalid or missing`);
+                throw GatewayError(err.message);
             }
             throw GatewayError("Stripe returned an unexpected error");
         }

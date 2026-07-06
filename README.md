@@ -117,12 +117,13 @@ Create a charge using a tokenized payment method. The `provider` field selects w
 
 Use these Stripe test payment method tokens in the `token` field:
 
-| `token`                     | Result             |
-| --------------------------- | ------------------ |
-| `pm_card_visa`              | Success            |
-| `pm_card_mastercard`        | Success            |
-| `pm_card_chargeDeclined`    | Declined           |
-| `pm_card_insufficientFunds` | Insufficient funds |
+| `token`                                   | Result             |
+| ----------------------------------------- | ------------------ |
+| `pm_card_visa`                            | Success            |
+| `pm_card_mastercard`                      | Success            |
+| `pm_card_chargeDeclined`                  | Card declined      |
+| `pm_card_chargeDeclinedExpiredCard`       | Card expired       |
+| `pm_card_chargeDeclinedInsufficientFunds` | Insufficient funds |
 
 ## Error Responses
 
