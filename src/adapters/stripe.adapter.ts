@@ -1,11 +1,11 @@
 import Stripe from "stripe";
 import { STRIPE_PRIVATE_KEY } from "../config.js";
 import { GatewayError, BadRequestError } from "../errors.js";
-import type { ChargeInput, ChargeResult, PaymentAdapter } from "./payment.adapter.js";
+import type { ChargeInput, ChargeResult, DirectChargeAdapter } from "./payment.adapter.js";
 
 const client = new Stripe(STRIPE_PRIVATE_KEY, { apiVersion: "2026-06-24.dahlia" });
 
-export class StripeAdapter implements PaymentAdapter {
+export class StripeAdapter implements DirectChargeAdapter {
     async charge(input: ChargeInput): Promise<ChargeResult> {
         const { token, amount, currency, customer_email, description, metadata, idempotencyKey } =
             input;
