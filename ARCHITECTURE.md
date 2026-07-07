@@ -171,9 +171,15 @@ Stack traces are included only in non-production environments.
 
 E2E tests live under `tests/e2e` and are written in a BDD-style `Given/When/Then` structure where it helps readability. External payment providers are mocked so CI does not depend on network calls or real provider credentials. CI runs `npm test`; coverage is available as a local/manual check with `npm run test:coverage`.
 
-## Rate limiting
+## Security
 
-`express-rate-limit` is applied globally in `src/app.ts` (disabled when `NODE_ENV=test`). Defaults: 60 requests per 1-minute window. Configure via `RATE_LIMIT_WINDOW_MINUTES` and `RATE_LIMIT_MAX`.
+`helmet` sets secure HTTP headers on every response.
+
+`express-rate-limit` is applied globally in `src/app.ts` (disabled when `NODE_ENV=test`, unless `FORCE_RATE_LIMIT_IN_TEST=true` for isolated tests). Default: 60 requests per 1-minute window per IP. Configure via `RATE_LIMIT_WINDOW_MINUTES` and `RATE_LIMIT_MAX`. Payment creation endpoints (`POST /api/payments/charge`, `POST /api/payments/orders`) use a dedicated stricter limiter in `src/payments/payments.router.ts`: 10 requests per minute per IP (hardcoded; mitigates card testing without affecting capture or health routes).
+
+CORS is intentionally unrestricted: this API is consumed server-to-server (no browser clients or session cookies), so an origin allowlist does not apply unlike Helmet and rate limiting, which protect every request regardless of caller type.
+
+The rate limiter store is in-memory, so counters are not shared across multiple instances when the service scales horizontally. Limits are keyed by IP only; they do not replace dedicated fraud detection tools such as Stripe Radar.
 
 ## Environment configuration
 

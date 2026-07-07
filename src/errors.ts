@@ -18,3 +18,6 @@ export const UnprocessableError = (message: string) =>
 export const NotFoundError = (message: string) => createAppError(message, "NotFoundError", 404);
 
 export const GatewayError = (message: string) => createAppError(message, "GatewayError", 502);
+
+export const TooManyRequestsError = (message = "Rate limit exceeded") =>
+    createAppError(message, "TooManyRequestsError", 429);

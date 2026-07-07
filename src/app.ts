@@ -6,11 +6,20 @@ import helmet from "helmet";
 import cors from "cors";
 import routes from "./routes/index.js";
 import { notFoundHandler, errorGenericHandler } from "./middleware/error.js";
-import { NODE_ENV, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MINUTES } from "./config.js";
+import { rateLimitExceededHandler } from "./middleware/rateLimit.js";
+import {
+    NODE_ENV,
+    RATE_LIMIT_ENABLED,
+    RATE_LIMIT_MAX,
+    RATE_LIMIT_WINDOW_MINUTES,
+} from "./config.js";
 import logger from "./utils/logger.js";
 import type { Request } from "express";
 
 const app = express();
+
+// Required so rate limiting uses the real client IP when the service runs behind a proxy/load balancer.
+app.set("trust proxy", 1);
 
 app.use(helmet());
 
@@ -33,15 +42,17 @@ if (NODE_ENV !== "test") {
     );
 }
 
+// CORS is intentionally open: this API is consumed server-to-server (no browser clients or session cookies), so an origin allowlist does not apply.
 app.use(cors());
 
-if (NODE_ENV !== "test") {
+if (RATE_LIMIT_ENABLED) {
     app.use(
         rateLimit({
             windowMs: RATE_LIMIT_WINDOW_MINUTES * 60 * 1000,
             limit: RATE_LIMIT_MAX,
             standardHeaders: true,
             legacyHeaders: false,
+            handler: rateLimitExceededHandler,
         })
     );
 }

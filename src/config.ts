@@ -38,6 +38,9 @@ export const {
     LOG_LEVEL,
 } = parsedEnv.data;
 
+export const RATE_LIMIT_ENABLED =
+    NODE_ENV !== "test" || process.env.FORCE_RATE_LIMIT_IN_TEST === "true";
+
 export function getPayPalConfig() {
     if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
         throw GatewayError("PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET are required to use PayPal");
