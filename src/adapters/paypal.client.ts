@@ -1,5 +1,6 @@
 import { getPayPalConfig } from "../config.js";
 import { BadRequestError, GatewayError } from "../errors.js";
+import { toPayPalAmount } from "../utils/money.js";
 
 interface PayPalAmount {
     value: string;
@@ -51,7 +52,7 @@ export class PayPalClient {
                     {
                         amount: {
                             currency_code: input.currency.toUpperCase(),
-                            value: input.amount.toFixed(2),
+                            value: toPayPalAmount(input.amount, input.currency),
                         },
                         ...(input.description !== undefined && { description: input.description }),
                         ...(input.metadata !== undefined && {

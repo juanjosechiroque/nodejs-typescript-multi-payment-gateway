@@ -129,6 +129,8 @@ Idempotency-Key: 7f8f40e7-8f7a-4c0c-9f2f-4f20c62d3c62
 | `description`    | string | No       | Charge description                       |
 | `metadata`       | object | No       | Key-value string pairs                   |
 
+3-decimal currencies (BHD, KWD, OMR, JOD, TND, LYD) are explicitly rejected — provider support is undocumented, not assumed.
+
 The `Idempotency-Key` header is required and must be a valid UUID. It is forwarded to Stripe so safe retries do not create duplicate charges.
 
 #### `POST /api/payments/orders`

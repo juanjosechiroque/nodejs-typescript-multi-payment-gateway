@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { STRIPE_PRIVATE_KEY } from "../config.js";
 import { GatewayError, BadRequestError } from "../errors.js";
+import { fromStripeAmount, toStripeAmount } from "../utils/money.js";
 import type { ChargeInput, ChargeResult, DirectChargeAdapter } from "./payment.adapter.js";
 
 const client = new Stripe(STRIPE_PRIVATE_KEY, { apiVersion: "2026-06-24.dahlia" });
@@ -17,7 +18,7 @@ export class StripeAdapter implements DirectChargeAdapter {
 
             const intentParams: Stripe.PaymentIntentCreateParams = {
                 payment_method: token,
-                amount: Math.round((amount + Number.EPSILON) * 100),
+                amount: toStripeAmount(amount, currency),
                 currency: currency.toLowerCase(),
                 confirm: true,
                 payment_method_types: ["card"],
@@ -35,7 +36,7 @@ export class StripeAdapter implements DirectChargeAdapter {
                 provider: "stripe",
                 charge_id: intent.id,
                 status: intent.status === "succeeded" ? "succeeded" : "pending",
-                amount,
+                amount: fromStripeAmount(intent.amount, currency),
                 currency: currency.toUpperCase(),
             };
         } catch (err) {

@@ -2,14 +2,20 @@ import { randomUUID } from "crypto";
 import { describe, it, expect, vi } from "vitest";
 import request from "supertest";
 
-const { MockStripeCardError, MockStripeInvalidRequestError } = vi.hoisted(() => {
+const { MockStripeCardError, MockStripeInvalidRequestError, stripeMocks } = vi.hoisted(() => {
     class MockStripeCardError extends Error {}
 
     class MockStripeInvalidRequestError extends Error {
         param?: string;
     }
 
-    return { MockStripeCardError, MockStripeInvalidRequestError };
+    const paymentIntentsCreate = vi.fn();
+
+    return {
+        MockStripeCardError,
+        MockStripeInvalidRequestError,
+        stripeMocks: { paymentIntentsCreate },
+    };
 });
 
 vi.mock("stripe", () => {
@@ -25,20 +31,23 @@ vi.mock("stripe", () => {
         };
 
         paymentIntents = {
-            create: vi.fn().mockImplementation((params: { payment_method: string }) => {
-                if (params.payment_method === "pm_card_chargeDeclined") {
-                    throw new MockStripeCardError("Your card was declined.");
-                }
+            create: stripeMocks.paymentIntentsCreate.mockImplementation(
+                (params: { payment_method: string; amount: number }) => {
+                    if (params.payment_method === "pm_card_chargeDeclined") {
+                        throw new MockStripeCardError("Your card was declined.");
+                    }
 
-                if (params.payment_method === "pm_card_chargeDeclinedExpiredCard") {
-                    throw new MockStripeCardError("Your card has expired.");
-                }
+                    if (params.payment_method === "pm_card_chargeDeclinedExpiredCard") {
+                        throw new MockStripeCardError("Your card has expired.");
+                    }
 
-                return Promise.resolve({
-                    id: "pi_test",
-                    status: "succeeded",
-                });
-            }),
+                    return Promise.resolve({
+                        id: "pi_test",
+                        status: "succeeded",
+                        amount: params.amount,
+                    });
+                }
+            ),
         };
     }
 
@@ -65,7 +74,7 @@ interface ErrorResponse {
 const validBody = {
     provider: "stripe",
     token: "pm_card_visa",
-    amount: 100,
+    amount: 10,
     currency: "USD",
     customer_email: "test@example.com",
 };
@@ -121,6 +130,32 @@ describe("POST /api/payments/charge", () => {
         });
     });
 
+    describe("when the amount has more decimal places than the currency allows", () => {
+        it("returns 400 with validation details", async () => {
+            const res = await post({ ...validBody, amount: 10.567 });
+            const body = res.body as ErrorResponse;
+
+            expect(res.status).toBe(400);
+            expect(body.code).toBe("BadRequestError");
+            expect(
+                body.details?.some(
+                    (d) => d.field === "amount" && d.message.includes("decimal place")
+                )
+            ).toBe(true);
+        });
+    });
+
+    describe("when the amount is below the minimum for a zero-decimal currency", () => {
+        it("returns 400 with validation details", async () => {
+            const res = await post({ ...validBody, currency: "JPY", amount: 0.5 });
+            const body = res.body as ErrorResponse;
+
+            expect(res.status).toBe(400);
+            expect(body.code).toBe("BadRequestError");
+            expect(body.details?.some((d) => d.field === "amount")).toBe(true);
+        });
+    });
+
     describe("when the currency is not a 3-character code", () => {
         it("returns 400 with validation details", async () => {
             const res = await post({ ...validBody, currency: "DOLLARS" });
@@ -129,6 +164,21 @@ describe("POST /api/payments/charge", () => {
             expect(res.status).toBe(400);
             expect(body.code).toBe("BadRequestError");
             expect(body.details?.some((d) => d.field === "currency")).toBe(true);
+        });
+    });
+
+    describe("when the currency requires 3 decimal places", () => {
+        it("returns 400 with validation details", async () => {
+            const res = await post({ ...validBody, currency: "BHD" });
+            const body = res.body as ErrorResponse;
+
+            expect(res.status).toBe(400);
+            expect(body.code).toBe("BadRequestError");
+            expect(
+                body.details?.some(
+                    (d) => d.field === "currency" && d.message.includes("not supported")
+                )
+            ).toBe(true);
         });
     });
 
@@ -164,6 +214,21 @@ describe("POST /api/payments/charge", () => {
             expect(body.charge_id).toMatch(/^pi_/);
             expect(body.amount).toBe(validBody.amount);
             expect(body.currency).toBe("USD");
+        });
+    });
+
+    describe("when charging a zero-decimal currency", () => {
+        it("returns 201 and sends the amount unchanged to Stripe", async () => {
+            const res = await post({ ...validBody, currency: "JPY", amount: 100 });
+            const body = res.body as ChargeResponse;
+
+            expect(res.status).toBe(201);
+            expect(body.amount).toBe(100);
+            expect(body.currency).toBe("JPY");
+            expect(stripeMocks.paymentIntentsCreate).toHaveBeenCalledWith(
+                expect.objectContaining({ amount: 100 }),
+                expect.anything()
+            );
         });
     });
 

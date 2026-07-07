@@ -42,7 +42,7 @@ interface ErrorResponse {
 
 const validOrderBody = {
     provider: "paypal",
-    amount: 100,
+    amount: 10,
     currency: "USD",
     customer_email: "buyer@example.com",
     description: "Order #1234",
@@ -77,7 +77,7 @@ describe("PayPal checkout order flow", () => {
                             {
                                 id: "PAYPAL_CAPTURE_123",
                                 status: "COMPLETED",
-                                amount: { value: "100.00", currency_code: "USD" },
+                                amount: { value: "10.00", currency_code: "USD" },
                             },
                         ],
                     },
@@ -132,6 +132,32 @@ describe("PayPal checkout order flow", () => {
             });
         });
 
+        describe("When the amount has more decimal places than the currency allows", () => {
+            it("Then returns 400 with validation details", async () => {
+                const res = await postOrder({ ...validOrderBody, amount: 10.567 });
+                const body = res.body as ErrorResponse;
+
+                expect(res.status).toBe(400);
+                expect(body.code).toBe("BadRequestError");
+                expect(
+                    body.details?.some(
+                        (d) => d.field === "amount" && d.message.includes("decimal place")
+                    )
+                ).toBe(true);
+            });
+        });
+
+        describe("When the amount is below the minimum for a zero-decimal currency", () => {
+            it("Then returns 400 with validation details", async () => {
+                const res = await postOrder({ ...validOrderBody, currency: "JPY", amount: 0.5 });
+                const body = res.body as ErrorResponse;
+
+                expect(res.status).toBe(400);
+                expect(body.code).toBe("BadRequestError");
+                expect(body.details?.some((d) => d.field === "amount")).toBe(true);
+            });
+        });
+
         describe("When the currency is not a 3-character code", () => {
             it("Then returns 400 with validation details", async () => {
                 const res = await postOrder({ ...validOrderBody, currency: "DOLLARS" });
@@ -140,6 +166,21 @@ describe("PayPal checkout order flow", () => {
                 expect(res.status).toBe(400);
                 expect(body.code).toBe("BadRequestError");
                 expect(body.details?.some((d) => d.field === "currency")).toBe(true);
+            });
+        });
+
+        describe("When the currency requires 3 decimal places", () => {
+            it("Then returns 400 with validation details", async () => {
+                const res = await postOrder({ ...validOrderBody, currency: "BHD" });
+                const body = res.body as ErrorResponse;
+
+                expect(res.status).toBe(400);
+                expect(body.code).toBe("BadRequestError");
+                expect(
+                    body.details?.some(
+                        (d) => d.field === "currency" && d.message.includes("not supported")
+                    )
+                ).toBe(true);
             });
         });
 
@@ -194,7 +235,7 @@ describe("PayPal checkout order flow", () => {
                 expect(body.provider).toBe("paypal");
                 expect(body.charge_id).toBe("PAYPAL_CAPTURE_123");
                 expect(body.status).toBe("succeeded");
-                expect(body.amount).toBe(100);
+                expect(body.amount).toBe(10);
                 expect(body.currency).toBe("USD");
                 expect(paypalMocks.captureOrder).toHaveBeenCalledWith(
                     "PAYPAL_ORDER_123",
