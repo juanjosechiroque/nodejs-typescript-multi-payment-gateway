@@ -3,7 +3,6 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { BadRequestError } from "../errors.js";
 import { captureCheckoutOrder, charge, createCheckoutOrder } from "./payments.service.js";
 import {
-    captureOrderParamsSchema,
     type CaptureOrderParams,
     type ChargeBody,
     type CreateOrderBody,
@@ -59,7 +58,7 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const captureOrder = asyncHandler(async (req: Request, res: Response) => {
-    const params: CaptureOrderParams = captureOrderParamsSchema.parse(req.params);
+    const params = req.params as unknown as CaptureOrderParams;
     const idempotencyKey = getIdempotencyKey(req);
 
     const result = await captureCheckoutOrder({

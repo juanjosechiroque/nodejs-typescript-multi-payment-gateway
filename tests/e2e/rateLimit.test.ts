@@ -3,6 +3,7 @@ import request from "supertest";
 import type { Express } from "express";
 
 describe("payment creation rate limiting", () => {
+    // The same paymentLimit middleware (10 req/min) also applies to POST /orders/:provider/:providerOrderId/capture.
     const originalForceRateLimit = process.env.FORCE_RATE_LIMIT_IN_TEST;
     const originalStripeKey = process.env.STRIPE_PRIVATE_KEY;
     let app: Express;

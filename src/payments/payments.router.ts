@@ -1,10 +1,14 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import type { NextFunction, Request, Response } from "express";
-import { validate } from "../middleware/validate.js";
+import { validate, validateParams } from "../middleware/validate.js";
 import { rateLimitExceededHandler } from "../middleware/rateLimit.js";
 import { RATE_LIMIT_ENABLED } from "../config.js";
-import { chargeSchema, createOrderSchema } from "./payments.validation.js";
+import {
+    chargeSchema,
+    createOrderSchema,
+    captureOrderParamsSchema,
+} from "./payments.validation.js";
 import { captureOrder, createCharge, createOrder } from "./payments.controller.js";
 
 const router = Router();
@@ -26,6 +30,11 @@ const paymentLimit = RATE_LIMIT_ENABLED
 
 router.post("/charge", paymentLimit, validate(chargeSchema), createCharge);
 router.post("/orders", paymentLimit, validate(createOrderSchema), createOrder);
-router.post("/orders/:provider/:providerOrderId/capture", captureOrder);
+router.post(
+    "/orders/:provider/:providerOrderId/capture",
+    paymentLimit,
+    validateParams(captureOrderParamsSchema),
+    captureOrder
+);
 
 export default router;

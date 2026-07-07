@@ -19,3 +19,12 @@ export function validate(schema: ZodType): RequestHandler {
         next();
     };
 }
+
+export function validateParams(schema: ZodType): RequestHandler {
+    return (req: Request, _res: Response, next: NextFunction) => {
+        const result = schema.safeParse(req.params ?? {});
+        if (!result.success) return next(buildValidationError(result.error));
+        req.params = result.data as Request["params"];
+        next();
+    };
+}

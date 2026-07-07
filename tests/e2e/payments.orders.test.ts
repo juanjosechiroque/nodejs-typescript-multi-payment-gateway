@@ -209,6 +209,22 @@ describe("PayPal checkout order flow", () => {
         });
     });
 
+    describe("Given a capture request with invalid route params", () => {
+        describe("When the provider is whitespace-only", () => {
+            it("Then returns 400 with validation details", async () => {
+                const res = await request(app)
+                    .post("/api/payments/orders/%20/PAYPAL_ORDER_123/capture")
+                    .set("Idempotency-Key", randomUUID());
+                const body = res.body as ErrorResponse;
+
+                expect(res.status).toBe(400);
+                expect(body.code).toBe("BadRequestError");
+                expect(body.message).toBe("Validation failed");
+                expect(body.details?.some((d) => d.field === "provider")).toBe(true);
+            });
+        });
+    });
+
     describe("Given an unsupported checkout capture provider", () => {
         describe("When the client captures the order", () => {
             it("Then returns 400 with BadRequestError", async () => {
